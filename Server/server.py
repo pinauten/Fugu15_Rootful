@@ -1,11 +1,12 @@
-from flask import Flask, request, render_template, make_response, after_this_request, Response
+from flask import Flask, request, render_template, make_response, after_this_request, Response, send_file
 import uuid
 import zipfile
 import io
 import plistlib
 import subprocess
+import os
 
-serverUrl = "jbme.pinauten.de"
+SSL_enabled = True
 
 with open("orig.ipa", "rb") as f:
     ipa = io.BytesIO(b"")
@@ -43,11 +44,6 @@ with open("orig.ipa", "rb") as f:
     ipaZip.close()
     ipaNewZip.close()
 
-ipa.seek(0)
-ipaData = ipa.read()
-with open("Fugu.ipa", "wb+") as f:
-    f.write(ipaData)
-
 app = Flask(__name__)
 
 ipaDownloadStarted = []
@@ -56,7 +52,8 @@ ipaDownloadDone    = []
 @app.route("/")
 def main_site():
     key = str(uuid.uuid4())
-    return render_template("index.html", key=key, server=serverUrl, appName=bundleName)
+    serverUrl = request.headers.get("Host", "localhost")
+    return render_template("index.html", key=key, server=serverUrl, appName=bundleName, ssl=SSL_enabled)
     
 @app.route("/didStartIPADownload")
 def didStartIPADownload():
@@ -76,6 +73,7 @@ def didDownloadIPA():
 
 @app.route("/<key>/manifest.plist")
 def getInfoPlist(key):
+    serverUrl = request.headers.get("Host", "localhost")
     response = make_response(render_template("manifest.plist", key=key, server=serverUrl, bundleId=bundleId, bundleVersion=bundleVersion, title="TotallyLegitDeveloperApp"))
     response.headers["Content-Type"] = "text/xml"
     return response
@@ -92,5 +90,14 @@ def getIPA(key):
     
     return Response(generate(), content_type="application/octet-stream")
 
+@app.route("/Fugu15_Troll.ipa")
+def getTrollIPA():
+    return send_file("Fugu15.ipa")
+
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=443, debug=False, ssl_context=("serverCert/fullchain.cer", "serverCert/server.key"))
+    if os.path.exists("serverCert/fullchain.cer") and os.path.exists("serverCert/server.key"):
+        app.run(host="0.0.0.0", port=443, debug=False, ssl_context=("serverCert/fullchain.cer", "serverCert/server.key"))
+    else:
+        print("No SSL cert -> Can only install via TrollStore")
+        SSL_enabled = False
+        app.run(host="0.0.0.0", port=8080)

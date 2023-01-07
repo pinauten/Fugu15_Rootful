@@ -7,6 +7,7 @@
 
 import SwiftUI
 import Fugu15KernelExploit
+import iDownload
 
 enum JBStatus {
     case notStarted
@@ -108,7 +109,7 @@ struct JailbreakView: View {
         do {
             statusUpdate("Status: Launching kexploitd")
             
-            try Fugu15.launchKernelExploit(oobPCI: Bundle.main.bundleURL.appendingPathComponent("oobPCI")) { msg in
+            let krw = try Fugu15DKKRW(oobPCI: Bundle.main.bundleURL.appendingPathComponent("oobPCI")) { msg in
                 if status != .done {
                     DispatchQueue.main.async {
                         if msg.hasPrefix("Status: ") {
@@ -120,7 +121,7 @@ struct JailbreakView: View {
                 }
             }
             
-            try Fugu15.launch_iDownload()
+            try iDownload.launch_iDownload(krw: iDownloadKRW(krw: krw))
             
             DispatchQueue.main.async {
                 statusUpdate("Status: Done!")

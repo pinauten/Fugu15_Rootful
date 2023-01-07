@@ -28,7 +28,9 @@ Building Fugu15 requires multiple Tools which can be found in the `Tools` direct
 If you want to build them yourself, simply run `make` in the `Tools` directory.
 
 # Installing
-There are two ways to install Fugu15 on your device: Via Safari or via USB
+Note: This is only relevant if you built Fugu15 yourself. If you're using a precompiled release, see the instructions for your release.
+
+There are three ways to install Fugu15 on your device: Via Safari, USB or TrollStore.
 
 ## Installing via Safari
 To install Fugu15 via Safari, do the following (requires you to own a domain):  
@@ -36,13 +38,17 @@ To install Fugu15 via Safari, do the following (requires you to own a domain):
 2. Change the DNS A record for a domain you own to the local IP-Address of your computer
 3. Obtain a certificate for your domain (e.g. via Let's Encrypt) and copy it to `Server/serverCert/fullchain.cer` (the certificate itself) and `Server/serverCert/server.key` (private key)
 4. Make sure you have Flask installed (`pip3 install Flask`)
-5. Change `serverUrl` in `Server/server.py` to your domain
-6. Run `python3 server.py` in the `Server` directory
-7. Visit `https://<your domain>` on your iPhone and follow the instructions
+5. Run `python3 server.py` in the `Server` directory
+6. Visit `https://<your domain>` on your iPhone and follow the instructions
 
 ## Installing via USB
 1. Install `Fugu15_Developer.ipa`, e.g. via `ideviceinstaller -i Fugu15_Developer.ipa`. Alternatively, install Fugu15/Fugu15.ipa via TrollStore.
 2. Open the newly installed "Developer" App (or whatever AppStore App you used) on your iPhone
+
+## Installing via TrollStore
+1. Make sure you have TrollStore installed
+2. Copy `Fugu15/Fugu15.ipa` to your device (e.g. via iCloud). Alternatively, rename `Fugu15/Fugu15.ipa` to `Fugu15/Fugu15.tipa` (make sure you actually renamed the file!) and AirDrop the file to your iPhone
+3. Open TrollStore and install the IPA. If you used AirDrop, you only have to select TrollStore in the "Open with..." prompt
 
 # iDownload
 Like all Fugu jailbreaks, Fugu15 ships with iDownload. The iDownload shell can be accessed on port 1337 (run `iproxy 1337 1337 &` and then `nc 127.1 1337` to connect to iDownload).  
