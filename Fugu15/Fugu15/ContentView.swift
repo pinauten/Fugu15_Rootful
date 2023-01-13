@@ -13,7 +13,7 @@ import UIKit
 import AppKit
 #endif
 
-import Fugu15KernelExploit
+//import Fugu15KernelExploit
 
 struct ContentView: View {
     @State var logText = ""

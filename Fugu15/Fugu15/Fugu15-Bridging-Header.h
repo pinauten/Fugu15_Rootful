@@ -5,3 +5,4 @@
 #include "posix_spawn.h"
 #include "LSApplicationWorkspace.h"
 #include "LSApplicationProxy.h"
+#include "libgrabkernel.h"

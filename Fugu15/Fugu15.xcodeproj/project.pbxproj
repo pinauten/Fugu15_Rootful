@@ -11,7 +11,6 @@
 		1502A40E2891B03F0011CB6E /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1502A40D2891B03F0011CB6E /* ContentView.swift */; };
 		1502A4102891B0410011CB6E /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 1502A40F2891B0410011CB6E /* Assets.xcassets */; };
 		1502A4132891B0410011CB6E /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 1502A4122891B0410011CB6E /* Preview Assets.xcassets */; };
-		1502A4242891BD800011CB6E /* Fugu15KernelExploit in Frameworks */ = {isa = PBXBuildFile; productRef = 1502A4232891BD800011CB6E /* Fugu15KernelExploit */; };
 		1502A4262891BE320011CB6E /* oobPCI in Resources */ = {isa = PBXBuildFile; fileRef = 1502A4252891BE320011CB6E /* oobPCI */; };
 		151CAFA2289348E200B2A6BA /* RemoveFuguInstall.swift in Sources */ = {isa = PBXBuildFile; fileRef = 151CAFA1289348E200B2A6BA /* RemoveFuguInstall.swift */; };
 		151CAFAD2893645C00B2A6BA /* CoreServices.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 151CAFAC2893645C00B2A6BA /* CoreServices.framework */; };
@@ -24,6 +23,13 @@
 		15372EA428DDF5EF00514A73 /* tar in Resources */ = {isa = PBXBuildFile; fileRef = 15372EA128DDF5EF00514A73 /* tar */; };
 		15372EA628DDFF9000514A73 /* sileo.deb in Frameworks */ = {isa = PBXBuildFile; fileRef = 15372EA528DDFF9000514A73 /* sileo.deb */; };
 		15372EA728DDFF9A00514A73 /* sileo.deb in Resources */ = {isa = PBXBuildFile; fileRef = 15372EA528DDFF9000514A73 /* sileo.deb */; };
+		1586A0812970E46E004C5ED6 /* KRW in Frameworks */ = {isa = PBXBuildFile; productRef = 1586A0802970E46E004C5ED6 /* KRW */; };
+		1586A0832970EAF7004C5ED6 /* model_tmp.hwx in Resources */ = {isa = PBXBuildFile; fileRef = 1586A0822970EAF7004C5ED6 /* model_tmp.hwx */; };
+		1586A08D2970F48A004C5ED6 /* libcurl.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 1586A0882970F454004C5ED6 /* libcurl.a */; };
+		1586A08F2970F85C004C5ED6 /* libMobileGestalt.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = 1586A08E2970F855004C5ED6 /* libMobileGestalt.tbd */; };
+		1586A0922970F871004C5ED6 /* libz.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = 1586A0912970F868004C5ED6 /* libz.tbd */; };
+		1586A0942970FFCE004C5ED6 /* libgrabkernel.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 1586A0932970FFCE004C5ED6 /* libgrabkernel.a */; };
+		1586A0962970FFDB004C5ED6 /* libfragmentzip.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 1586A0952970FFDB004C5ED6 /* libfragmentzip.a */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -35,7 +41,6 @@
 		1502A41B2891B0980011CB6E /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		1502A41C2891B1260011CB6E /* posix_spawn.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = posix_spawn.h; sourceTree = "<group>"; };
 		1502A41D2891B1360011CB6E /* Fugu15-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "Fugu15-Bridging-Header.h"; sourceTree = "<group>"; };
-		1502A4212891BD790011CB6E /* Fugu15KernelExploit */ = {isa = PBXFileReference; lastKnownFileType = wrapper; name = Fugu15KernelExploit; path = ../Packages/Fugu15KernelExploit; sourceTree = "<group>"; };
 		1502A4252891BE320011CB6E /* oobPCI */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.executable"; name = oobPCI; path = ../Exploits/oobPCI/oobPCI; sourceTree = "<group>"; };
 		1502A4292891BF0A0011CB6E /* Fugu15.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Fugu15.entitlements; sourceTree = "<group>"; };
 		1502A42A2891BF130011CB6E /* Makefile */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.make; path = Makefile; sourceTree = "<group>"; };
@@ -53,6 +58,16 @@
 		15372EA028DDF5EF00514A73 /* bootstrap.tar */ = {isa = PBXFileReference; lastKnownFileType = archive.tar; path = bootstrap.tar; sourceTree = "<group>"; };
 		15372EA128DDF5EF00514A73 /* tar */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.executable"; path = tar; sourceTree = "<group>"; };
 		15372EA528DDFF9000514A73 /* sileo.deb */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = sileo.deb; sourceTree = "<group>"; };
+		1586A07F2970E1DE004C5ED6 /* KRW */ = {isa = PBXFileReference; lastKnownFileType = wrapper; name = KRW; path = ../Packages/KRW; sourceTree = "<group>"; };
+		1586A0822970EAF7004C5ED6 /* model_tmp.hwx */ = {isa = PBXFileReference; lastKnownFileType = file; path = model_tmp.hwx; sourceTree = "<group>"; };
+		1586A0862970F454004C5ED6 /* libgrabkernel.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = libgrabkernel.h; sourceTree = "<group>"; };
+		1586A0882970F454004C5ED6 /* libcurl.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libcurl.a; sourceTree = "<group>"; };
+		1586A0892970F454004C5ED6 /* module.modulemap */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.module-map"; path = module.modulemap; sourceTree = "<group>"; };
+		1586A08E2970F855004C5ED6 /* libMobileGestalt.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = libMobileGestalt.tbd; path = usr/lib/libMobileGestalt.tbd; sourceTree = SDKROOT; };
+		1586A0902970F861004C5ED6 /* libc.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = libc.tbd; path = usr/lib/libc.tbd; sourceTree = SDKROOT; };
+		1586A0912970F868004C5ED6 /* libz.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = libz.tbd; path = usr/lib/libz.tbd; sourceTree = SDKROOT; };
+		1586A0932970FFCE004C5ED6 /* libgrabkernel.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libgrabkernel.a; sourceTree = "<group>"; };
+		1586A0952970FFDB004C5ED6 /* libfragmentzip.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libfragmentzip.a; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -60,9 +75,14 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				1502A4242891BD800011CB6E /* Fugu15KernelExploit in Frameworks */,
+				1586A0942970FFCE004C5ED6 /* libgrabkernel.a in Frameworks */,
+				1586A0812970E46E004C5ED6 /* KRW in Frameworks */,
+				1586A0922970F871004C5ED6 /* libz.tbd in Frameworks */,
 				15372EA628DDFF9000514A73 /* sileo.deb in Frameworks */,
+				1586A08F2970F85C004C5ED6 /* libMobileGestalt.tbd in Frameworks */,
+				1586A0962970FFDB004C5ED6 /* libfragmentzip.a in Frameworks */,
 				151CAFAD2893645C00B2A6BA /* CoreServices.framework in Frameworks */,
+				1586A08D2970F48A004C5ED6 /* libcurl.a in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -72,8 +92,10 @@
 		1502A3FF2891B03F0011CB6E = {
 			isa = PBXGroup;
 			children = (
+				1586A0822970EAF7004C5ED6 /* model_tmp.hwx */,
 				1502A4252891BE320011CB6E /* oobPCI */,
-				1502A4212891BD790011CB6E /* Fugu15KernelExploit */,
+				1586A0842970F454004C5ED6 /* libgrabkernel */,
+				1586A07F2970E1DE004C5ED6 /* KRW */,
 				1502A42A2891BF130011CB6E /* Makefile */,
 				1502A40A2891B03F0011CB6E /* Fugu15 */,
 				1502A4092891B03F0011CB6E /* Products */,
@@ -133,6 +155,9 @@
 		151CAFAB2893645C00B2A6BA /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
+				1586A0912970F868004C5ED6 /* libz.tbd */,
+				1586A0902970F861004C5ED6 /* libc.tbd */,
+				1586A08E2970F855004C5ED6 /* libMobileGestalt.tbd */,
 				151CAFAC2893645C00B2A6BA /* CoreServices.framework */,
 			);
 			name = Frameworks;
@@ -147,6 +172,26 @@
 				15372E9F28DDF5EF00514A73 /* TrustCache */,
 			);
 			path = bootstrap;
+			sourceTree = "<group>";
+		};
+		1586A0842970F454004C5ED6 /* libgrabkernel */ = {
+			isa = PBXGroup;
+			children = (
+				1586A0852970F454004C5ED6 /* include */,
+				1586A0882970F454004C5ED6 /* libcurl.a */,
+				1586A0932970FFCE004C5ED6 /* libgrabkernel.a */,
+				1586A0952970FFDB004C5ED6 /* libfragmentzip.a */,
+				1586A0892970F454004C5ED6 /* module.modulemap */,
+			);
+			path = libgrabkernel;
+			sourceTree = "<group>";
+		};
+		1586A0852970F454004C5ED6 /* include */ = {
+			isa = PBXGroup;
+			children = (
+				1586A0862970F454004C5ED6 /* libgrabkernel.h */,
+			);
+			path = include;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -166,7 +211,7 @@
 			);
 			name = Fugu15;
 			packageProductDependencies = (
-				1502A4232891BD800011CB6E /* Fugu15KernelExploit */,
+				1586A0802970E46E004C5ED6 /* KRW */,
 			);
 			productName = Fugu15;
 			productReference = 1502A4082891B03F0011CB6E /* Fugu15.app */;
@@ -218,6 +263,7 @@
 				1502A4132891B0410011CB6E /* Preview Assets.xcassets in Resources */,
 				15372EA328DDF5EF00514A73 /* bootstrap.tar in Resources */,
 				1502A4102891B0410011CB6E /* Assets.xcassets in Resources */,
+				1586A0832970EAF7004C5ED6 /* model_tmp.hwx in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -363,6 +409,7 @@
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEAD_CODE_STRIPPING = NO;
 				DEVELOPMENT_ASSET_PATHS = "\"Fugu15/Preview Content\"";
 				DEVELOPMENT_TEAM = 3ZQ6958H75;
 				ENABLE_PREVIEWS = YES;
@@ -372,7 +419,7 @@
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortraitUpsideDown";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortraitUpsideDown";
 				IPHONEOS_DEPLOYMENT_TARGET = 14.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -380,15 +427,18 @@
 				);
 				LIBRARY_SEARCH_PATHS = (
 					"$(inherited)",
-					"$(PROJECT_DIR)/Fugu15/bootstrap",
+					"$(PROJECT_DIR)/libgrabkernel",
 				);
 				MARKETING_VERSION = 1.0;
 				OTHER_LDFLAGS = (
 					"-framework",
 					IOKit,
+					"-L$(SRCROOT)/../OfflinePackages/KernelPatchfinder/Sources/libgrabkernel",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = de.pinauten.Fugu15;
+				PRODUCT_BUNDLE_IDENTIFIER = "de.pinauten.Fugu15-Real";
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRIP_INSTALLED_PRODUCT = NO;
+				STRIP_STYLE = debugging;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_OBJC_BRIDGING_HEADER = "Fugu15/Fugu15-Bridging-Header.h";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
@@ -405,6 +455,7 @@
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEAD_CODE_STRIPPING = NO;
 				DEVELOPMENT_ASSET_PATHS = "\"Fugu15/Preview Content\"";
 				DEVELOPMENT_TEAM = 3ZQ6958H75;
 				ENABLE_PREVIEWS = YES;
@@ -414,7 +465,7 @@
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortraitUpsideDown";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortraitUpsideDown";
 				IPHONEOS_DEPLOYMENT_TARGET = 14.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -422,15 +473,18 @@
 				);
 				LIBRARY_SEARCH_PATHS = (
 					"$(inherited)",
-					"$(PROJECT_DIR)/Fugu15/bootstrap",
+					"$(PROJECT_DIR)/libgrabkernel",
 				);
 				MARKETING_VERSION = 1.0;
 				OTHER_LDFLAGS = (
 					"-framework",
 					IOKit,
+					"-L$(SRCROOT)/../OfflinePackages/KernelPatchfinder/Sources/libgrabkernel",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = de.pinauten.Fugu15;
+				PRODUCT_BUNDLE_IDENTIFIER = "de.pinauten.Fugu15-Real";
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRIP_INSTALLED_PRODUCT = NO;
+				STRIP_STYLE = debugging;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_OBJC_BRIDGING_HEADER = "Fugu15/Fugu15-Bridging-Header.h";
 				SWIFT_VERSION = 5.0;
@@ -462,9 +516,9 @@
 /* End XCConfigurationList section */
 
 /* Begin XCSwiftPackageProductDependency section */
-		1502A4232891BD800011CB6E /* Fugu15KernelExploit */ = {
+		1586A0802970E46E004C5ED6 /* KRW */ = {
 			isa = XCSwiftPackageProductDependency;
-			productName = Fugu15KernelExploit;
+			productName = KRW;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

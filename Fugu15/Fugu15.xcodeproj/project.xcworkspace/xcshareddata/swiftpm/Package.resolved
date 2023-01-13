@@ -1,52 +1,50 @@
 {
-  "object": {
-    "pins": [
-      {
-        "package": "iDownload",
-        "repositoryURL": "https://github.com/pinauten/iDownload",
-        "state": {
-          "branch": "master",
-          "revision": "62920e864f06af4b0a50a0aa9b6e0a7c7bd83a6f",
-          "version": null
-        }
-      },
-      {
-        "package": "KernelPatchfinder",
-        "repositoryURL": "https://github.com/pinauten/KernelPatchfinder",
-        "state": {
-          "branch": "master",
-          "revision": "f53a9e7a15d6fa4afdb447838ff7a65892d52a82",
-          "version": null
-        }
-      },
-      {
-        "package": "PatchfinderUtils",
-        "repositoryURL": "https://github.com/pinauten/PatchfinderUtils",
-        "state": {
-          "branch": "master",
-          "revision": "8f9d9fb3afa8e745f477f9612464e51b463e8975",
-          "version": null
-        }
-      },
-      {
-        "package": "SwiftMachO",
-        "repositoryURL": "https://github.com/pinauten/SwiftMachO",
-        "state": {
-          "branch": "master",
-          "revision": "d433b349d7e69bb8fd5d18ea5cdbcd8b731ddf55",
-          "version": null
-        }
-      },
-      {
-        "package": "SwiftUtils",
-        "repositoryURL": "https://github.com/pinauten/SwiftUtils",
-        "state": {
-          "branch": "master",
-          "revision": "1d37faabb4c58b3152394c9b6e1c1a68507646b9",
-          "version": null
-        }
+  "pins" : [
+    {
+      "identity" : "idownload",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/pinauten/iDownload",
+      "state" : {
+        "branch" : "master",
+        "revision" : "62920e864f06af4b0a50a0aa9b6e0a7c7bd83a6f"
       }
-    ]
-  },
-  "version": 1
+    },
+    {
+      "identity" : "kernelpatchfinder",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/pinauten/KernelPatchfinder",
+      "state" : {
+        "branch" : "master",
+        "revision" : "c7098c75e8b3b78e12df89f2f3ddb5e5102c680f"
+      }
+    },
+    {
+      "identity" : "patchfinderutils",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/pinauten/PatchfinderUtils",
+      "state" : {
+        "branch" : "master",
+        "revision" : "b8de0fe7f9fb9bee22bb33eedce1fa9ee803f4f6"
+      }
+    },
+    {
+      "identity" : "swiftmacho",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/pinauten/SwiftMachO",
+      "state" : {
+        "branch" : "master",
+        "revision" : "d433b349d7e69bb8fd5d18ea5cdbcd8b731ddf55"
+      }
+    },
+    {
+      "identity" : "swiftutils",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/pinauten/SwiftUtils",
+      "state" : {
+        "branch" : "master",
+        "revision" : "1d37faabb4c58b3152394c9b6e1c1a68507646b9"
+      }
+    }
+  ],
+  "version" : 2
 }

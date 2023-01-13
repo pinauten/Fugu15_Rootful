@@ -6,7 +6,7 @@
 //
 
 import Foundation
-import Fugu15KernelExploit
+//import Fugu15KernelExploit
 
 func execCmd(args: [String], fileActions: posix_spawn_file_actions_t? = nil) -> Int32? {
     var fileActions = fileActions
@@ -55,6 +55,6 @@ if CommandLine.arguments.count > 1 {
     }
 }
 
-Fugu15.mainHook()
+//Fugu15.mainHook()
 
 Fugu15App.main()

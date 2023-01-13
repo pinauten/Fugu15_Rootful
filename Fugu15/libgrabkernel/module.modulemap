@@ -1,0 +1,7 @@
+module libgrabkernel {
+    header "include/libgrabkernel.h"
+    link "curl"
+    link "fragmentzip"
+    link "grabkernel"
+    export *
+}

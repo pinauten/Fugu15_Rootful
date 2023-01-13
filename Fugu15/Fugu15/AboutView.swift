@@ -77,7 +77,7 @@ struct AboutView: View {
                     .padding(.bottom)
                     .frame(maxHeight: 100)
                     .onTapGesture {
-                        openURL(URL(string: "https://pinauten.de/")!)
+                        openURL(URL(string: "https://pinauten.de/\(libgrabkernel_version())")!)
                     }
             }.padding(.bottom, 25)
         }
