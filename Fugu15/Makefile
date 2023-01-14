@@ -5,8 +5,6 @@ all: Fugu15.ipa
 Fugu15.ipa: build/Build/Products/Debug-iphoneos/Fugu15.app
 	@echo Ad-Hoc signing Fugu15
 	codesign -s - --entitlements Fugu15/Fugu15.entitlements build/Build/Products/Debug-iphoneos/Fugu15.app
-	@echo Fake-signing Fugu15
-	../Tools/fastPathSign/fastPathSign build/Build/Products/Debug-iphoneos/Fugu15.app
 	@echo Creating ipa
 	rm -rf Payload Fugu15.ipa
 	mkdir Payload

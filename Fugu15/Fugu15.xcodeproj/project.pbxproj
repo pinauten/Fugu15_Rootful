@@ -11,7 +11,6 @@
 		1502A40E2891B03F0011CB6E /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1502A40D2891B03F0011CB6E /* ContentView.swift */; };
 		1502A4102891B0410011CB6E /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 1502A40F2891B0410011CB6E /* Assets.xcassets */; };
 		1502A4132891B0410011CB6E /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 1502A4122891B0410011CB6E /* Preview Assets.xcassets */; };
-		1502A4262891BE320011CB6E /* oobPCI in Resources */ = {isa = PBXBuildFile; fileRef = 1502A4252891BE320011CB6E /* oobPCI */; };
 		151CAFA2289348E200B2A6BA /* RemoveFuguInstall.swift in Sources */ = {isa = PBXBuildFile; fileRef = 151CAFA1289348E200B2A6BA /* RemoveFuguInstall.swift */; };
 		151CAFAD2893645C00B2A6BA /* CoreServices.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 151CAFAC2893645C00B2A6BA /* CoreServices.framework */; };
 		151CAFAF28936D4B00B2A6BA /* JailbreakView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 151CAFAE28936D4B00B2A6BA /* JailbreakView.swift */; };
@@ -42,7 +41,6 @@
 		1502A41B2891B0980011CB6E /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		1502A41C2891B1260011CB6E /* posix_spawn.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = posix_spawn.h; sourceTree = "<group>"; };
 		1502A41D2891B1360011CB6E /* Fugu15-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "Fugu15-Bridging-Header.h"; sourceTree = "<group>"; };
-		1502A4252891BE320011CB6E /* oobPCI */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.executable"; name = oobPCI; path = ../Exploits/oobPCI/oobPCI; sourceTree = "<group>"; };
 		1502A4292891BF0A0011CB6E /* Fugu15.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Fugu15.entitlements; sourceTree = "<group>"; };
 		1502A42A2891BF130011CB6E /* Makefile */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.make; path = Makefile; sourceTree = "<group>"; };
 		151CAFA1289348E200B2A6BA /* RemoveFuguInstall.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoveFuguInstall.swift; sourceTree = "<group>"; };
@@ -95,7 +93,6 @@
 			isa = PBXGroup;
 			children = (
 				1586A0822970EAF7004C5ED6 /* model_tmp.hwx */,
-				1502A4252891BE320011CB6E /* oobPCI */,
 				1586A0842970F454004C5ED6 /* libgrabkernel */,
 				1586A07F2970E1DE004C5ED6 /* KRW */,
 				1502A42A2891BF130011CB6E /* Makefile */,
@@ -263,7 +260,6 @@
 				15372EA728DDFF9A00514A73 /* sileo.deb in Resources */,
 				15372EA428DDF5EF00514A73 /* tar in Resources */,
 				15372EA228DDF5EF00514A73 /* TrustCache in Resources */,
-				1502A4262891BE320011CB6E /* oobPCI in Resources */,
 				1502A4132891B0410011CB6E /* Preview Assets.xcassets in Resources */,
 				15372EA328DDF5EF00514A73 /* bootstrap.tar in Resources */,
 				1502A4102891B0410011CB6E /* Assets.xcassets in Resources */,
