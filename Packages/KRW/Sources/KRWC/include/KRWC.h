@@ -10,6 +10,9 @@
 #define KRWC_h
 
 #include <stdint.h>
+#include "../badRecovery/offsets.h"
+#include "../badRecovery/badRecovery.h"
+#include "../badRecovery/tlbFail.h"
 
 typedef uintptr_t (*patchfinder_get_offset_func)(const char * _Nonnull name);
 

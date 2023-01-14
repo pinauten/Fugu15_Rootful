@@ -10,15 +10,6 @@
       }
     },
     {
-      "identity" : "kernelpatchfinder",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/pinauten/KernelPatchfinder",
-      "state" : {
-        "branch" : "master",
-        "revision" : "c7098c75e8b3b78e12df89f2f3ddb5e5102c680f"
-      }
-    },
-    {
       "identity" : "patchfinderutils",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/pinauten/PatchfinderUtils",

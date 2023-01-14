@@ -136,7 +136,9 @@ struct JailbreakView: View {
                 }
             }
             
-            try iDownload.launch_iDownload(krw: KRW())
+            try testkrwstuff()
+            
+            try iDownload.launch_iDownload(krw: KRW(), otherCmds: iDownloadCmds)
             
             DispatchQueue.main.async {
                 statusUpdate("Status: Done!")

@@ -1,5 +1,5 @@
 //
-//  dummy.c
+//  glue.c
 //  KRWC
 //
 //  Created by Linus Henze on 2023-01-13.
@@ -7,10 +7,20 @@
 //
 
 #include "include/KRWC.h"
+#include "badRecovery/offsets.h"
+
+#include <string.h>
+#include <stdbool.h>
 
 extern int exploit(void);
+extern void kwrite64(uint64_t address, uint64_t value);
+extern uint64_t kread64(uint64_t address);
 extern uint32_t kread32(uint64_t address);
 extern uintptr_t gKernelBase;
+
+KernelOffsetInfo gOffsets;
+uint64_t gOurTask;
+uint64_t gKernelPmap;
 
 int krw_init(patchfinder_get_offset_func _Nonnull func) {
     return exploit();
@@ -26,13 +36,8 @@ int krw_kread(uintptr_t kernSrc, void * _Nonnull dst, size_t size) {
         
         if (bytesToRead == 4) {
             *v32++ = value;
-        } else if (bytesToRead == 3) {
-            *(uint16_t*)v32 = (uint16_t) value;
-            ((uint8_t*)v32)[2] = (uint8_t) (value >> 16);
-        } else if (bytesToRead == 2) {
-            *(uint16_t*)v32 = (uint16_t) value;
-        } else if (bytesToRead == 1) {
-            *(uint8_t*)v32 = (uint8_t) value;
+        } else {
+            memcpy(dst, &value, bytesToRead);
         }
         
         size -= bytesToRead;
@@ -42,9 +47,32 @@ int krw_kread(uintptr_t kernSrc, void * _Nonnull dst, size_t size) {
 }
 
 int krw_kwrite(uintptr_t kernDst, const void * _Nonnull src, size_t size) {
-    return 2;
+    uint8_t *v8 = (uint8_t*) src;
+    
+    while (size >= 8) {
+        kwrite64(kernDst, *(uint64_t*)v8);
+        size -= 8;
+        v8 += 8;
+        kernDst += 8;
+    }
+    
+    if (size) {
+        uint64_t val = kread64(kernDst);
+        memcpy(&val, v8, size);
+        kwrite64(kernDst, val);
+    }
+    
+    return 0;
 }
 
 uintptr_t krw_kbase(void) {
     return gKernelBase;
+}
+
+bool kernread (uint64_t addr, size_t len, void *buffer) {
+    return krw_kread(addr, buffer, len) == 0;
+}
+
+bool kernwrite(uint64_t addr, void *buffer, size_t len) {
+    return krw_kwrite(addr, buffer, len);
 }

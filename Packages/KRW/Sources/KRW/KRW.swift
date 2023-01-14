@@ -13,6 +13,9 @@ import iDownload
 
 public enum KRWError: Error {
     case failed(providerError: Int32)
+    case patchfinderFailed(symbol: String)
+    case failedToTranslate(address: UInt64, table: String, entry: UInt64)
+    case failedToGetKObject(ofPort: mach_port_t)
 }
 
 fileprivate func get_offset(_ name: UnsafePointer<CChar>) -> UInt {
@@ -23,9 +26,24 @@ fileprivate func get_offset(_ name: UnsafePointer<CChar>) -> UInt {
     return 0
 }
 
-public class KRW: KRWHandler {
-    private static var didInit = false
-    public  static let patchfinder = KernelPatchfinder.running
+public class KRW {
+    private  static var didInit     = false
+    internal static var didInitPAC  = false
+    internal static var didInitPPL  = false
+    public   static let patchfinder = KernelPatchfinder.running!
+    
+    internal static var phystokvTable: [phystokvEntry] = []
+    internal static var physBase: UInt64 = 0
+    internal static var virtBase: UInt64 = 0
+    internal static var ttep: UInt64?
+    
+    public private(set) static var ourProc: Proc? = {
+        try? Proc(pid: getpid())
+    }()
+    
+    public private(set) static var kernelProc: Proc? = {
+        try? Proc(pid: 0)
+    }()
     
     public static var logger: (_: String) -> Void = {_ in }
     
@@ -33,16 +51,10 @@ public class KRW: KRWHandler {
         try Self.doInit()
     }
     
-    private static func doInit() throws {
+    internal static func doInit() throws {
         guard !didInit else {
             return
         }
-        
-        guard let pf = KernelPatchfinder.running else {
-            throw KRWError.failed(providerError: 1234)
-        }
-        
-        logger("ACT_CONTEXT: \(pf.ACT_CONTEXT ?? 0)")
         
         let res = krw_init(get_offset)
         guard res == 0 else {
@@ -67,6 +79,35 @@ public class KRW: KRWHandler {
         return data
     }
     
+    public static func kreadGeneric<T>(virt: UInt64, type: T.Type = T.self) throws -> T {
+        try kread(virt: virt, size: MemoryLayout<T>.size).getGeneric(type: T.self)
+    }
+    
+    public static func rPtr(virt: UInt64) throws -> UInt64 {
+        let ptr: UInt64 = try kreadGeneric(virt: virt)
+        if ((ptr >> 55) & 1) == 1 {
+            return ptr | 0xFFFFFF8000000000
+        }
+        
+        return ptr
+    }
+    
+    public static func r64(virt: UInt64) throws -> UInt64 {
+        try kreadGeneric(virt: virt)
+    }
+    
+    public static func r32(virt: UInt64) throws -> UInt32 {
+        try kreadGeneric(virt: virt)
+    }
+    
+    public static func r16(virt: UInt64) throws -> UInt16 {
+        try kreadGeneric(virt: virt)
+    }
+    
+    public static func r8(virt: UInt64) throws -> UInt8 {
+        try kreadGeneric(virt: virt)
+    }
+    
     public static func kwrite(virt: UInt64, data: Data) throws {
         try doInit()
         
@@ -79,52 +120,37 @@ public class KRW: KRWHandler {
         }
     }
     
+    public static func kwriteGeneric<T>(virt: UInt64, object: T) throws {
+        try kwrite(virt: virt, data: Data(fromObject: object))
+    }
+    
+    public static func w64(virt: UInt64, value: UInt64) throws {
+        try kwriteGeneric(virt: virt, object: value)
+    }
+    
+    public static func w32(virt: UInt64, value: UInt32) throws {
+        try kwriteGeneric(virt: virt, object: value)
+    }
+    
+    public static func w16(virt: UInt64, value: UInt16) throws {
+        try kwriteGeneric(virt: virt, object: value)
+    }
+    
+    public static func w8(virt: UInt64, value: UInt8) throws {
+        try kwriteGeneric(virt: virt, object: value)
+    }
+    
     public static func kbase() throws -> UInt64 {
         try doInit()
         
         return UInt64(krw_kbase())
     }
     
-    // iDownload KRW stuff
-    public func getSupportedActions() -> iDownload.KRWOptions {
-        .virtRW
+    public static func kslide() throws -> UInt64 {
+        try Self.kbase() &- 0xFFFFFFF007004000
     }
     
-    public func getInfo() throws -> (kernelBase: UInt64, slide: UInt64) {
-        let kbase = try Self.kbase()
-        
-        return (kernelBase: kbase, slide: kbase &- 0xFFFFFFF007004000)
-    }
-    
-    public func resolveAddress(forName: String) throws -> iDownload.KRWAddress? {
-        return nil
-    }
-    
-    public func kread(address: iDownload.KRWAddress, size: UInt) throws -> Data {
-        guard address.options == [] else {
-            throw iDownload.KRWError.notSupported
-        }
-        
-        return try Self.kread(virt: address.address, size: Int(size))
-    }
-    
-    public func kwrite(address: iDownload.KRWAddress, data: Data) throws {
-        guard address.options == [] else {
-            throw iDownload.KRWError.notSupported
-        }
-        
-        try Self.kwrite(virt: address.address, data: data)
-    }
-    
-    public func kalloc(size: UInt) throws -> UInt64 {
-        throw iDownload.KRWError.notSupported
-    }
-    
-    public func kfree(address: UInt64) throws {
-        throw iDownload.KRWError.notSupported
-    }
-    
-    public func kcall(func: iDownload.KRWAddress, a1: UInt64, a2: UInt64, a3: UInt64, a4: UInt64, a5: UInt64, a6: UInt64, a7: UInt64, a8: UInt64) throws -> UInt64 {
-        throw iDownload.KRWError.notSupported
+    public static func slide(virt: UInt64) throws -> UInt64 {
+        try virt + Self.kslide()
     }
 }

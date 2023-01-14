@@ -21,7 +21,6 @@
 		15372EA228DDF5EF00514A73 /* TrustCache in Resources */ = {isa = PBXBuildFile; fileRef = 15372E9F28DDF5EF00514A73 /* TrustCache */; };
 		15372EA328DDF5EF00514A73 /* bootstrap.tar in Resources */ = {isa = PBXBuildFile; fileRef = 15372EA028DDF5EF00514A73 /* bootstrap.tar */; };
 		15372EA428DDF5EF00514A73 /* tar in Resources */ = {isa = PBXBuildFile; fileRef = 15372EA128DDF5EF00514A73 /* tar */; };
-		15372EA628DDFF9000514A73 /* sileo.deb in Frameworks */ = {isa = PBXBuildFile; fileRef = 15372EA528DDFF9000514A73 /* sileo.deb */; };
 		15372EA728DDFF9A00514A73 /* sileo.deb in Resources */ = {isa = PBXBuildFile; fileRef = 15372EA528DDFF9000514A73 /* sileo.deb */; };
 		1586A0812970E46E004C5ED6 /* KRW in Frameworks */ = {isa = PBXBuildFile; productRef = 1586A0802970E46E004C5ED6 /* KRW */; };
 		1586A0832970EAF7004C5ED6 /* model_tmp.hwx in Resources */ = {isa = PBXBuildFile; fileRef = 1586A0822970EAF7004C5ED6 /* model_tmp.hwx */; };
@@ -30,6 +29,8 @@
 		1586A0922970F871004C5ED6 /* libz.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = 1586A0912970F868004C5ED6 /* libz.tbd */; };
 		1586A0942970FFCE004C5ED6 /* libgrabkernel.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 1586A0932970FFCE004C5ED6 /* libgrabkernel.a */; };
 		1586A0962970FFDB004C5ED6 /* libfragmentzip.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 1586A0952970FFDB004C5ED6 /* libfragmentzip.a */; };
+		1586A0AB2971AFBE004C5ED6 /* Test.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1586A0AA2971AFBE004C5ED6 /* Test.swift */; };
+		1586A0AD29726DFF004C5ED6 /* iDownloadCmds.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1586A0AC29726DFF004C5ED6 /* iDownloadCmds.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -68,6 +69,8 @@
 		1586A0912970F868004C5ED6 /* libz.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = libz.tbd; path = usr/lib/libz.tbd; sourceTree = SDKROOT; };
 		1586A0932970FFCE004C5ED6 /* libgrabkernel.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libgrabkernel.a; sourceTree = "<group>"; };
 		1586A0952970FFDB004C5ED6 /* libfragmentzip.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libfragmentzip.a; sourceTree = "<group>"; };
+		1586A0AA2971AFBE004C5ED6 /* Test.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Test.swift; sourceTree = "<group>"; };
+		1586A0AC29726DFF004C5ED6 /* iDownloadCmds.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = iDownloadCmds.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -78,7 +81,6 @@
 				1586A0942970FFCE004C5ED6 /* libgrabkernel.a in Frameworks */,
 				1586A0812970E46E004C5ED6 /* KRW in Frameworks */,
 				1586A0922970F871004C5ED6 /* libz.tbd in Frameworks */,
-				15372EA628DDFF9000514A73 /* sileo.deb in Frameworks */,
 				1586A08F2970F85C004C5ED6 /* libMobileGestalt.tbd in Frameworks */,
 				1586A0962970FFDB004C5ED6 /* libfragmentzip.a in Frameworks */,
 				151CAFAD2893645C00B2A6BA /* CoreServices.framework in Frameworks */,
@@ -119,6 +121,8 @@
 				1502A40B2891B03F0011CB6E /* Fugu15App.swift */,
 				1502A40D2891B03F0011CB6E /* ContentView.swift */,
 				151CAFAE28936D4B00B2A6BA /* JailbreakView.swift */,
+				1586A0AA2971AFBE004C5ED6 /* Test.swift */,
+				1586A0AC29726DFF004C5ED6 /* iDownloadCmds.swift */,
 				151CAFB028936DE800B2A6BA /* LogView.swift */,
 				151CAFB42894070300B2A6BA /* AboutView.swift */,
 				151CAFA1289348E200B2A6BA /* RemoveFuguInstall.swift */,
@@ -279,7 +283,9 @@
 				151CAFB32894041D00B2A6BA /* main.swift in Sources */,
 				151CAFB128936DE800B2A6BA /* LogView.swift in Sources */,
 				1502A40C2891B03F0011CB6E /* Fugu15App.swift in Sources */,
+				1586A0AB2971AFBE004C5ED6 /* Test.swift in Sources */,
 				151CAFAF28936D4B00B2A6BA /* JailbreakView.swift in Sources */,
+				1586A0AD29726DFF004C5ED6 /* iDownloadCmds.swift in Sources */,
 				151CAFA2289348E200B2A6BA /* RemoveFuguInstall.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -433,7 +439,6 @@
 				OTHER_LDFLAGS = (
 					"-framework",
 					IOKit,
-					"-L$(SRCROOT)/../OfflinePackages/KernelPatchfinder/Sources/libgrabkernel",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = "de.pinauten.Fugu15-Real";
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -479,7 +484,6 @@
 				OTHER_LDFLAGS = (
 					"-framework",
 					IOKit,
-					"-L$(SRCROOT)/../OfflinePackages/KernelPatchfinder/Sources/libgrabkernel",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = "de.pinauten.Fugu15-Real";
 				PRODUCT_NAME = "$(TARGET_NAME)";
