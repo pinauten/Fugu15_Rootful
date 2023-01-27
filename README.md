@@ -3,6 +3,46 @@ Fugu15 is a semi-untethered permasigned jailbreak for iOS 15.
 It contains a code-signing bypass, kernel exploit, kernel PAC bypass and PPL bypass.  
 Additionally, it can be installed via Safari, i.e. a computer is not required, except for a Web Server that hosts Fugu15.  
 
+# Progress
+Current Fugu15 progress.
+
+## Fugu15
+- [x] Make Fugu15 a non-rootless jailbreak
+- [ ] Automatically mount Fugu15 partitions over real rootFS
+- [ ] Allow execution of self-signed binaries
+- [ ] Allow loading of self-signed binaries
+- [ ] Implement Tweak Injection
+- [ ] Allow unsigned code
+- [ ] ???
+
+## FuFuGuGu
+Library injected into launchd and xpcproxy
+- [x] Successfully inject into launchd
+- [x] Hook required methods
+- [x] Survive userspace reboots
+- [ ] Tell jailbreakd new bootstrap port
+- [ ] Inject into xpcproxy
+- [ ] Give processes access to certain sandboxed directories
+- [ ] Load tweak injection library
+- [ ] ???
+
+## jailbreakd
+Helper service
+- [x] Transfer PPL bypass to jailbreakd
+- [ ] Transfer PAC bypass to jailbreakd
+- [x] Survive userspace reboot
+- [ ] Re-Check in after userspace reboot
+- [ ] Provide service to add CDHash to TrustCache
+- [ ] Provide service to allow applications to access sandboxed files/folders
+- [ ] Provide service to allow applications to execute unsigned code
+- [ ] Implement libkrw/libkernrw/libwhateverrw support
+- [ ] ???
+
+## dyld
+- [x] Patch dyld to allow `DYLD_INSERT_LIBRARIES` (done via `DYLD_AMFI_FAKE`)
+- [ ] Automatically patch dyld
+- [ ] ???
+
 # Tested Devices and iOS Versions
 - iPhone 12 (SRD): iOS 15.4.1
 
