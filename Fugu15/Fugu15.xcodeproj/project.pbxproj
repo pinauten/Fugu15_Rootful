@@ -30,6 +30,13 @@
 		1586A0962970FFDB004C5ED6 /* libfragmentzip.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 1586A0952970FFDB004C5ED6 /* libfragmentzip.a */; };
 		1586A0AB2971AFBE004C5ED6 /* Test.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1586A0AA2971AFBE004C5ED6 /* Test.swift */; };
 		1586A0AD29726DFF004C5ED6 /* iDownloadCmds.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1586A0AC29726DFF004C5ED6 /* iDownloadCmds.swift */; };
+		1586A0B529736DA1004C5ED6 /* jailbreakd in Resources */ = {isa = PBXBuildFile; fileRef = 1586A0B429736D97004C5ED6 /* jailbreakd */; };
+		15C730482973942500AE243E /* init.c in Sources */ = {isa = PBXBuildFile; fileRef = 15C730472973942500AE243E /* init.c */; };
+		15CF9FB0297F35E0003B1D00 /* inject_criticald in Resources */ = {isa = PBXBuildFile; fileRef = 15CF9FAF297F35E0003B1D00 /* inject_criticald */; };
+		15D8E631297F857A004EB223 /* bindmount in Resources */ = {isa = PBXBuildFile; fileRef = 15D8E630297F8576004EB223 /* bindmount */; };
+		15D8E633298067DE004EB223 /* bootstrapFS in Resources */ = {isa = PBXBuildFile; fileRef = 15D8E632298067D7004EB223 /* bootstrapFS */; };
+		15D8E635298082F6004EB223 /* libFuFuGuGu.dylib in Resources */ = {isa = PBXBuildFile; fileRef = 15D8E634298082B2004EB223 /* libFuFuGuGu.dylib */; };
+		15D8E6392980E843004EB223 /* dyld_hax in Resources */ = {isa = PBXBuildFile; fileRef = 15D8E6382980E83D004EB223 /* dyld_hax */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -69,6 +76,14 @@
 		1586A0952970FFDB004C5ED6 /* libfragmentzip.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libfragmentzip.a; sourceTree = "<group>"; };
 		1586A0AA2971AFBE004C5ED6 /* Test.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Test.swift; sourceTree = "<group>"; };
 		1586A0AC29726DFF004C5ED6 /* iDownloadCmds.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = iDownloadCmds.swift; sourceTree = "<group>"; };
+		1586A0B429736D97004C5ED6 /* jailbreakd */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.executable"; name = jailbreakd; path = ../jailbreakd/jailbreakd; sourceTree = "<group>"; };
+		15C730472973942500AE243E /* init.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = init.c; sourceTree = "<group>"; };
+		15C730492973942B00AE243E /* init.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = init.h; sourceTree = "<group>"; };
+		15CF9FAF297F35E0003B1D00 /* inject_criticald */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.executable"; path = inject_criticald; sourceTree = "<group>"; };
+		15D8E630297F8576004EB223 /* bindmount */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.executable"; path = bindmount; sourceTree = "<group>"; };
+		15D8E632298067D7004EB223 /* bootstrapFS */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.executable"; name = bootstrapFS; path = ../bootstrapFS/bootstrapFS; sourceTree = "<group>"; };
+		15D8E634298082B2004EB223 /* libFuFuGuGu.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; name = libFuFuGuGu.dylib; path = ../FuFuGuGu/libFuFuGuGu.dylib; sourceTree = "<group>"; };
+		15D8E6382980E83D004EB223 /* dyld_hax */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylinker"; path = dyld_hax; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -92,7 +107,13 @@
 		1502A3FF2891B03F0011CB6E = {
 			isa = PBXGroup;
 			children = (
+				1586A0B429736D97004C5ED6 /* jailbreakd */,
+				15D8E630297F8576004EB223 /* bindmount */,
+				15D8E632298067D7004EB223 /* bootstrapFS */,
+				15D8E6382980E83D004EB223 /* dyld_hax */,
 				1586A0822970EAF7004C5ED6 /* model_tmp.hwx */,
+				15CF9FAF297F35E0003B1D00 /* inject_criticald */,
+				15D8E634298082B2004EB223 /* libFuFuGuGu.dylib */,
 				1586A0842970F454004C5ED6 /* libgrabkernel */,
 				1586A07F2970E1DE004C5ED6 /* KRW */,
 				1502A42A2891BF130011CB6E /* Makefile */,
@@ -128,6 +149,8 @@
 				1502A4112891B0410011CB6E /* Preview Content */,
 				151CAFA32893621300B2A6BA /* include */,
 				1502A41D2891B1360011CB6E /* Fugu15-Bridging-Header.h */,
+				15C730472973942500AE243E /* init.c */,
+				15C730492973942B00AE243E /* init.h */,
 				1502A4292891BF0A0011CB6E /* Fugu15.entitlements */,
 			);
 			path = Fugu15;
@@ -260,6 +283,12 @@
 				15372EA728DDFF9A00514A73 /* sileo.deb in Resources */,
 				15372EA428DDF5EF00514A73 /* tar in Resources */,
 				15372EA228DDF5EF00514A73 /* TrustCache in Resources */,
+				15D8E635298082F6004EB223 /* libFuFuGuGu.dylib in Resources */,
+				1586A0B529736DA1004C5ED6 /* jailbreakd in Resources */,
+				15D8E6392980E843004EB223 /* dyld_hax in Resources */,
+				15D8E633298067DE004EB223 /* bootstrapFS in Resources */,
+				15D8E631297F857A004EB223 /* bindmount in Resources */,
+				15CF9FB0297F35E0003B1D00 /* inject_criticald in Resources */,
 				1502A4132891B0410011CB6E /* Preview Assets.xcassets in Resources */,
 				15372EA328DDF5EF00514A73 /* bootstrap.tar in Resources */,
 				1502A4102891B0410011CB6E /* Assets.xcassets in Resources */,
@@ -279,6 +308,7 @@
 				151CAFB32894041D00B2A6BA /* main.swift in Sources */,
 				151CAFB128936DE800B2A6BA /* LogView.swift in Sources */,
 				1502A40C2891B03F0011CB6E /* Fugu15App.swift in Sources */,
+				15C730482973942500AE243E /* init.c in Sources */,
 				1586A0AB2971AFBE004C5ED6 /* Test.swift in Sources */,
 				151CAFAF28936D4B00B2A6BA /* JailbreakView.swift in Sources */,
 				1586A0AD29726DFF004C5ED6 /* iDownloadCmds.swift in Sources */,
@@ -422,7 +452,7 @@
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortraitUpsideDown";
-				IPHONEOS_DEPLOYMENT_TARGET = 14.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -430,6 +460,7 @@
 				LIBRARY_SEARCH_PATHS = (
 					"$(inherited)",
 					"$(PROJECT_DIR)/libgrabkernel",
+					"$(PROJECT_DIR)",
 				);
 				MARKETING_VERSION = 1.0;
 				OTHER_LDFLAGS = (
@@ -467,7 +498,7 @@
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortraitUpsideDown";
-				IPHONEOS_DEPLOYMENT_TARGET = 14.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -475,6 +506,7 @@
 				LIBRARY_SEARCH_PATHS = (
 					"$(inherited)",
 					"$(PROJECT_DIR)/libgrabkernel",
+					"$(PROJECT_DIR)",
 				);
 				MARKETING_VERSION = 1.0;
 				OTHER_LDFLAGS = (

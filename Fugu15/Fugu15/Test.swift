@@ -48,8 +48,13 @@ func testkrwstuff() throws {
     print("Hilo!")
     
     try KRW.doPPLBypass()
+    KRW.ourProc?.ucred = try Proc(pid: 1)?.ucred
 }
 
-func withKernelCredentials<T>(_ do: () throws -> T) rethrows {
+func withKernelCredentials<T>(_ block: () throws -> T) rethrows -> T {
+    let saved = KRW.ourProc?.ucred
+    KRW.ourProc?.ucred = KRW.kernelProc?.ucred
+    defer { KRW.ourProc?.ucred = saved }
     
+    return try block()
 }

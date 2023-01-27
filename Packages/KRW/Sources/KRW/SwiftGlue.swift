@@ -56,3 +56,16 @@ public func rp64(_ phys: UInt64) -> UInt64 {
 public func translateAddr_inTTEP(_ ttep: UInt64, _ virt: UInt64) -> UInt64 {
     (try? KRW.walkPageTable(table: ttep, virt: virt)) ?? 0
 }
+
+@_cdecl("getPageForPPL")
+public func getPageForPPL() -> UInt64 {
+    guard let f = KRW.patchfinder.pmap_alloc_page_for_kern else {
+        return 0
+    }
+    
+    guard let fSlid = try? KRW.slide(virt: f) else {
+        return 0
+    }
+    
+    return (try? KRW.kcall(func: fSlid, a1: 0, a2: 0, a3: 0, a4: 0, a5: 0, a6: 0, a7: 0, a8: 0)) ?? 0
+}

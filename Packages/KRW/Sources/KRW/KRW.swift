@@ -33,9 +33,9 @@ public class KRW {
     public   static let patchfinder = KernelPatchfinder.running!
     
     internal static var phystokvTable: [phystokvEntry] = []
-    internal static var physBase: UInt64 = 0
-    internal static var virtBase: UInt64 = 0
-    internal static var ttep: UInt64?
+    public internal(set) static var physBase: UInt64 = 0
+    public internal(set) static var virtBase: UInt64 = 0
+    public internal(set) static var ttep: UInt64?
     
     public private(set) static var ourProc: Proc? = {
         try? Proc(pid: getpid())
@@ -43,6 +43,10 @@ public class KRW {
     
     public private(set) static var kernelProc: Proc? = {
         try? Proc(pid: 0)
+    }()
+    
+    public private(set) static var launchdProc: Proc? = {
+        try? Proc(pid: 1)
     }()
     
     public static var logger: (_: String) -> Void = {_ in }

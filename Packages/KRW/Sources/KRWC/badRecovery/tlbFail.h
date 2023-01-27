@@ -14,6 +14,7 @@
 #include <mach/mach.h>
 
 bool pplBypass(void);
+void pplBypassDeinit(void);
 
 void* getPhysMapWindow(uint64_t phys);
 

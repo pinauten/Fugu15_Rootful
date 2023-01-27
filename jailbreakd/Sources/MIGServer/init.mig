@@ -1,0 +1,6 @@
+#include <mach/std_types.defs>
+
+subsystem init 0;
+
+routine set_kernel_infos(server_port: mach_port_t);
+routine set_bootstrap_port(server_port: mach_port_t; bp: mach_port_t);

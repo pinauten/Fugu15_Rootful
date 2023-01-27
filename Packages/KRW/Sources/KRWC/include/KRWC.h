@@ -13,6 +13,7 @@
 #include "../badRecovery/offsets.h"
 #include "../badRecovery/badRecovery.h"
 #include "../badRecovery/tlbFail.h"
+#include "../badRecovery/kernel.h"
 
 typedef uintptr_t (*patchfinder_get_offset_func)(const char * _Nonnull name);
 
@@ -22,5 +23,7 @@ int krw_kread(uintptr_t kernSrc, void * _Nonnull dst, size_t size);
 int krw_kwrite(uintptr_t kernDst, const void * _Nonnull src, size_t size);
 
 uintptr_t krw_kbase(void);
+
+void cleanup(void);
 
 #endif /* KRWC_h */

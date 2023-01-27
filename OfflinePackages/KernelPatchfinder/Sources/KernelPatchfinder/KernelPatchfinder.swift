@@ -801,6 +801,25 @@ open class KernelPatchfinder {
             pc -= 4
         }
     }()
+    
+    /// `pmap_alloc_page_for_kern` function
+    public lazy var pmap_alloc_page_for_kern: UInt64? = {
+        guard let func_str = cStrSect.addrOf("pmap_alloc_page_for_kern") else {
+            return nil
+        }
+        
+        guard var pc = textExec.findNextXref(to: func_str, optimization: .noBranches) else {
+            return nil
+        }
+        
+        while true {
+            if AArch64Instr.isPacibsp(textExec.instruction(at: pc) ?? 0) {
+                return pc
+            }
+            
+            pc -= 4
+        }
+    }()
 
     /// Return patchfinder for the currently running kernel.
     public static var running: KernelPatchfinder? = {

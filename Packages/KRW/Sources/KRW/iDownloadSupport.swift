@@ -11,7 +11,7 @@ import iDownload
 
 extension KRW: KRWHandler {
     public func getSupportedActions() -> iDownload.KRWOptions {
-        [.virtRW, .kcall, .kalloc, .PPLBypass]
+        [.virtRW, .physRW, .kcall, .kalloc, .PPLBypass]
     }
     
     public func getInfo() throws -> (kernelBase: UInt64, slide: UInt64) {

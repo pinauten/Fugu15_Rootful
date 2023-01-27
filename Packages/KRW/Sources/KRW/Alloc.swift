@@ -26,6 +26,12 @@ public extension KRW {
     }
     
     static func alloc(size: UInt64, leak: Bool = false) throws -> UInt64 {
+        if didInitPAC {
+            if let kalloc_data_external = patchfinder.kalloc_data_external {
+                return try kcall(func: slide(virt: kalloc_data_external), a1: size, a2: 1, a3: 0, a4: 0, a5: 0, a6: 0, a7: 0, a8: 0)
+            }
+        }
+        
         let allocSize = max(size, 65536)
         
         while true {

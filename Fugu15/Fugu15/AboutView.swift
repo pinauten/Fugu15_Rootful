@@ -17,6 +17,7 @@ struct AboutView: View {
 
         static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
             value = max(value, nextValue())
+            _ = libgrabkernel_version()
         }
     }
     
@@ -77,7 +78,7 @@ struct AboutView: View {
                     .padding(.bottom)
                     .frame(maxHeight: 100)
                     .onTapGesture {
-                        openURL(URL(string: "https://pinauten.de/\(libgrabkernel_version())")!)
+                        openURL(URL(string: "https://pinauten.de/")!)
                     }
             }.padding(.bottom, 25)
         }

@@ -7,6 +7,7 @@
 //  
 
 import Foundation
+import KRWC
 
 public class KernelObject {
     public let address: UInt64
@@ -33,6 +34,14 @@ public class KernelObject {
     
     public func r8(offset: UInt64) throws -> UInt8 {
         try KRW.r8(virt: self.address + offset)
+    }
+    
+    public func w64(offset: UInt64, value: UInt64) throws {
+        try KRW.w64(virt: self.address + offset, value: value)
+    }
+    
+    public func w64PPL(offset: UInt64, value: UInt64) throws {
+        try KRW.pplwrite(virt: self.address + offset, data: Data(fromObject: value))
     }
 }
 
@@ -63,8 +72,60 @@ public class Proc: KernelObject {
         return Task(address: addr)
     }
     
+    public var p_flag: UInt32? {
+        get {
+            try? r32(offset: 0x0)
+        }
+        set {
+            try? KRW.w32(virt: address + 0x0, value: newValue ?? 0)
+        }
+    }
+    
+    public var ro: Proc_RO? {
+        guard ProcessInfo.processInfo.operatingSystemVersion.majorVersion >= 15 && ProcessInfo.processInfo.operatingSystemVersion.minorVersion >= 2 else {
+            return nil
+        }
+        
+        guard let ro = try? rPtr(offset: 0x20) else {
+            return nil
+        }
+        
+        return Proc_RO(address: ro)
+    }
+    
     public var ucred: UInt64? {
-        try? rPtr(offset: 0)
+        get {
+            if ProcessInfo.processInfo.operatingSystemVersion.majorVersion >= 15 && ProcessInfo.processInfo.operatingSystemVersion.minorVersion >= 2 {
+                return ro?.ucred
+            }
+            
+            return nil // FIXME!
+        }
+        
+        set {
+            if ProcessInfo.processInfo.operatingSystemVersion.majorVersion >= 15 && ProcessInfo.processInfo.operatingSystemVersion.minorVersion >= 2 {
+                ro?.ucred = newValue
+                return
+            }
+            
+            // FIXME!
+        }
+    }
+}
+
+public class Proc_RO: KernelObject {
+    public var ucred: UInt64? {
+        get {
+            try? rPtr(offset: 0x20)
+        }
+        
+        set {
+            guard let new = newValue else {
+                return
+            }
+            
+            try? w64PPL(offset: 0x20, value: new)
+        }
     }
 }
 
@@ -130,11 +191,35 @@ public class KPort: KernelObject {
 }
 
 public class VMMap: KernelObject {
-    public var pmap: UInt64? {
+    public var pmap: PMap? {
         guard let VM_MAP_PMAP = KRW.patchfinder.VM_MAP_PMAP else {
             return nil
         }
         
-        return try? rPtr(offset: VM_MAP_PMAP)
+        guard let pmap = try? rPtr(offset: VM_MAP_PMAP) else {
+            return nil
+        }
+        
+        return PMap(address: pmap)
+    }
+}
+
+public class PMap: KernelObject {
+    public var type: UInt8? {
+        get {
+            let adjust: UInt64 = (KRW.patchfinder.kernel_el == 2) ? 8 : 0
+            
+            return try? r8(offset: 0xC8 + adjust)
+        }
+        
+        set {
+            guard newValue != nil else {
+                return
+            }
+            
+            let adjust: UInt64 = (KRW.patchfinder.kernel_el == 2) ? 8 : 0
+            
+            try? KRW.pplwrite(virt: self.address + 0xC8 + adjust, data: Data(fromObject: newValue.unsafelyUnwrapped))
+        }
     }
 }
