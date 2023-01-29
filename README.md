@@ -40,7 +40,7 @@ Helper service
 
 ## dyld
 - [x] Patch dyld to allow `DYLD_INSERT_LIBRARIES` (done via `DYLD_AMFI_FAKE`)
-- [ ] Automatically patch dyld
+- [x] Automatically patch dyld
 - [ ] ???
 
 # Tested Devices and iOS Versions

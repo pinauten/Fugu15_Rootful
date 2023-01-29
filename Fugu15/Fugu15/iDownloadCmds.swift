@@ -51,6 +51,7 @@ func pivot_root(new: String, old: String) throws -> UInt64 {
 func iDownload_rootfs(_ hndlr: iDownloadHandler, _ cmd: String, _ args: [String]) throws {
     if args.count != 6 {
         try hndlr.sendline("Usage: rootfs <app part> <lib part> <bin part> <etc part> <sbin part> <usr part>")
+        return
     }
     
     // Mount new tempfs

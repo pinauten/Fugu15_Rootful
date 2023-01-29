@@ -31,6 +31,7 @@
 		1586A0AB2971AFBE004C5ED6 /* Test.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1586A0AA2971AFBE004C5ED6 /* Test.swift */; };
 		1586A0AD29726DFF004C5ED6 /* iDownloadCmds.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1586A0AC29726DFF004C5ED6 /* iDownloadCmds.swift */; };
 		1586A0B529736DA1004C5ED6 /* jailbreakd in Resources */ = {isa = PBXBuildFile; fileRef = 1586A0B429736D97004C5ED6 /* jailbreakd */; };
+		15BEEA912986D189007D4825 /* ldid in Resources */ = {isa = PBXBuildFile; fileRef = 15BEEA902986D189007D4825 /* ldid */; };
 		15C730482973942500AE243E /* init.c in Sources */ = {isa = PBXBuildFile; fileRef = 15C730472973942500AE243E /* init.c */; };
 		15CF9FB0297F35E0003B1D00 /* inject_criticald in Resources */ = {isa = PBXBuildFile; fileRef = 15CF9FAF297F35E0003B1D00 /* inject_criticald */; };
 		15D8E631297F857A004EB223 /* bindmount in Resources */ = {isa = PBXBuildFile; fileRef = 15D8E630297F8576004EB223 /* bindmount */; };
@@ -77,6 +78,7 @@
 		1586A0AA2971AFBE004C5ED6 /* Test.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Test.swift; sourceTree = "<group>"; };
 		1586A0AC29726DFF004C5ED6 /* iDownloadCmds.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = iDownloadCmds.swift; sourceTree = "<group>"; };
 		1586A0B429736D97004C5ED6 /* jailbreakd */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.executable"; name = jailbreakd; path = ../jailbreakd/jailbreakd; sourceTree = "<group>"; };
+		15BEEA902986D189007D4825 /* ldid */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.executable"; path = ldid; sourceTree = "<group>"; };
 		15C730472973942500AE243E /* init.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = init.c; sourceTree = "<group>"; };
 		15C730492973942B00AE243E /* init.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = init.h; sourceTree = "<group>"; };
 		15CF9FAF297F35E0003B1D00 /* inject_criticald */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.executable"; path = inject_criticald; sourceTree = "<group>"; };
@@ -194,6 +196,7 @@
 				15372EA028DDF5EF00514A73 /* bootstrap.tar */,
 				15372EA128DDF5EF00514A73 /* tar */,
 				15372E9F28DDF5EF00514A73 /* TrustCache */,
+				15BEEA902986D189007D4825 /* ldid */,
 			);
 			path = bootstrap;
 			sourceTree = "<group>";
@@ -291,6 +294,7 @@
 				15CF9FB0297F35E0003B1D00 /* inject_criticald in Resources */,
 				1502A4132891B0410011CB6E /* Preview Assets.xcassets in Resources */,
 				15372EA328DDF5EF00514A73 /* bootstrap.tar in Resources */,
+				15BEEA912986D189007D4825 /* ldid in Resources */,
 				1502A4102891B0410011CB6E /* Assets.xcassets in Resources */,
 				1586A0832970EAF7004C5ED6 /* model_tmp.hwx in Resources */,
 			);

@@ -46,8 +46,14 @@ func ensureFuguPartition(name: String, realPath: String, rootfs: String) throws 
     // Copy real to new rootfs
     try copyRootfs(real: rootfs + realPath, new: mp)
     
-    // Create fsPrepared file
     mkdir(mp + "/.Fugu15", 0o700)
+    
+    if name == "Fugu15Usr" {
+        unlink(mp + "/usr/lib/dyld")
+        try patchDYLD(real: "/usr/lib/dyld", patched: mp + "/lib/dyld", trustCache: mp + "/.Fugu15/TrustCache")
+    }
+    
+    // Create fsPrepared file
     creat(mp + "/.Fugu15/fsPrepared", 0o600)
     sync()
     

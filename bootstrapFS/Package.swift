@@ -5,6 +5,10 @@ import PackageDescription
 
 let package = Package(
     name: "bootstrapFS",
+    platforms: [
+        .iOS(.v14),
+        .macOS(.v11)
+    ],
     products: [
         // Products define the executables and libraries a package produces, and make them visible to other packages.
         .executable(
@@ -13,7 +17,8 @@ let package = Package(
     ],
     dependencies: [
         // Dependencies declare other packages that this package depends on.
-        // .package(url: /* package url */, from: "1.0.0"),
+        .package(url: "https://github.com/pinauten/SwiftMachO", branch: "master"),
+        .package(url: "https://github.com/pinauten/PatchfinderUtils", branch: "master"),
     ],
     targets: [
         // Targets are the basic building blocks of a package. A target can define a module or a test suite.
@@ -21,6 +26,6 @@ let package = Package(
         .target(name: "CBridge"),
         .executableTarget(
             name: "bootstrapFS",
-            dependencies: ["CBridge"]),
+            dependencies: ["CBridge", "SwiftMachO", "PatchfinderUtils"]),
     ]
 )

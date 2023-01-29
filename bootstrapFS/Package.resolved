@@ -1,0 +1,32 @@
+{
+  "pins" : [
+    {
+      "identity" : "patchfinderutils",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/pinauten/PatchfinderUtils",
+      "state" : {
+        "branch" : "master",
+        "revision" : "b8de0fe7f9fb9bee22bb33eedce1fa9ee803f4f6"
+      }
+    },
+    {
+      "identity" : "swiftmacho",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/pinauten/SwiftMachO",
+      "state" : {
+        "branch" : "master",
+        "revision" : "ccab13cc9c225683d106b21d2cb5aad9a7ad8b25"
+      }
+    },
+    {
+      "identity" : "swiftutils",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/pinauten/SwiftUtils",
+      "state" : {
+        "branch" : "master",
+        "revision" : "1d37faabb4c58b3152394c9b6e1c1a68507646b9"
+      }
+    }
+  ],
+  "version" : 2
+}
