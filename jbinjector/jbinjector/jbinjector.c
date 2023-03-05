@@ -179,10 +179,10 @@ int giveCSDEBUGToPid(pid_t tgtpid){
         xpc_object_t rsp = NULL;
         //
         assure(req = xpc_dictionary_create(NULL, NULL, 0));
-        xpc_dictionary_set_string(req, "ACTION", "CSDEBUG");
-        xpc_dictionary_set_uint64(req, "PID", tgtpid);
+        xpc_dictionary_set_string(req, "action", "csdebug");
+        xpc_dictionary_set_uint64(req, "pid", tgtpid);
         assure(!xpc_pipe_routine(gJBDPipe, req, &rsp));
-        err = (int)xpc_dictionary_get_uint64(rsp, "STATUS");
+        err = (int)xpc_dictionary_get_uint64(rsp, "status");
     error:
         if (req){
             xpc_release(req); req = NULL;
@@ -201,11 +201,11 @@ int trustCDHash(const uint8_t *hash, size_t hashSize, uint8_t hashType){
         xpc_object_t rsp = NULL;
         //
         assure(req = xpc_dictionary_create(NULL, NULL, 0));
-        xpc_dictionary_set_string(req, "ACTION", "TRUSTCDHASH");
-        xpc_dictionary_set_data(req, "HASHDATA", hash, hashSize);
-        xpc_dictionary_set_uint64(req, "HASHTYPE", hashType);
+        xpc_dictionary_set_string(req, "action", "trustcdhash");
+        xpc_dictionary_set_data(req, "hashdata", hash, hashSize);
+        xpc_dictionary_set_uint64(req, "hashtype", hashType);
         assure(!xpc_pipe_routine(gJBDPipe, req, &rsp));
-        err = (int)xpc_dictionary_get_uint64(rsp, "STATUS");
+        err = (int)xpc_dictionary_get_uint64(rsp, "status");
     error:
         if (req){
             xpc_release(req); req = NULL;

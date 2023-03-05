@@ -3,6 +3,7 @@ tipa: all
 
 all %:
 	$(MAKE) -C bootstrapFS $@
+	$(MAKE) -C jbinjector $@
 	$(MAKE) -C FuFuGuGu $@
-	$(MAKE) -C jailbreakd $@
+	$(MAKE) -C stashd $@
 	$(MAKE) -C Fugu15 $@
