@@ -12,19 +12,7 @@ import SwiftMachO
 import PatchfinderUtils
 
 final class KernelPatchfinderTests: XCTestCase {
-    func testPatchfinder() throws {
-        /*guard let pf = KernelPatchfinder.running else {
-            XCTFail("KernelPatchfinder.running == nil!")
-            return
-        }*/
-        
-        // /Users/linus/kernelcache.release.iphone11.raw
-        // /Users/linus/Desktop/Fugu15_OBTS/Server/kernelcache.release.iphone14.raw
-        guard let pf = KernelPatchfinder(kernel: try! MachO(fromFile: "/Users/linus/kernelcache.release.iphone11.raw", okToLoadFAT: false)) else {
-            XCTFail("KernelPatchfinder.running == nil!")
-            return
-        }
-        
+    func test(pf: KernelPatchfinder) throws {
         XCTAssertNotNil(pf.allproc)
         XCTAssertNotNil(pf.cpu_ttep)
         XCTAssertNotNil(pf.pmap_enter_options_addr)
@@ -56,5 +44,33 @@ final class KernelPatchfinderTests: XCTestCase {
         XCTAssertNotNil(pf.ITK_SPACE)
         XCTAssertNotNil(pf.VM_MAP_PMAP)
         XCTAssertNotNil(pf.PORT_LABEL)
+    }
+    
+    func testPatchfinder() throws {
+        /*guard let pf = KernelPatchfinder.running else {
+            XCTFail("KernelPatchfinder.running == nil!")
+            return
+        }*/
+        
+        // /Users/linus/kernelcache.release.iphone11.raw
+        // /Users/linus/Desktop/Fugu15_OBTS/Server/kernelcache.release.iphone14.raw
+        guard let pf = KernelPatchfinder(kernel: try! MachO(fromFile: "/Users/linus/kernelcache.release.iphone11.raw", okToLoadFAT: false)) else {
+            XCTFail("KernelPatchfinder.running == nil!")
+            return
+        }
+        
+        try test(pf: pf)
+        
+        guard let data = pf.exportResults() else {
+            XCTFail("pf.exportResults() == nil!")
+            return
+        }
+        
+        guard let pfRes = KernelPatchfinder(fromCachedResults: data) else {
+            XCTFail("KernelPatchfinder(fromCachedResults: data) == nil!")
+            return
+        }
+        
+        try test(pf: pfRes)
     }
 }

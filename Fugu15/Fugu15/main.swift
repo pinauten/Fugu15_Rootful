@@ -8,6 +8,9 @@
 import Foundation
 //import Fugu15KernelExploit
 
+var pppp: mach_port_t = 0
+bootstrap_look_up(bootstrap_port, "jb-global-jbd", &pppp)
+
 func execCmd(args: [String], fileActions: posix_spawn_file_actions_t? = nil) -> Int32? {
     var fileActions = fileActions
     

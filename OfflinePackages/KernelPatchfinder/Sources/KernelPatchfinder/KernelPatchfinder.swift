@@ -12,7 +12,9 @@ import PatchfinderUtils
 import Darwin
 
 open class KernelPatchfinder {
-    public let kernel: MachO
+    public let kernel: MachO!
+    
+    public let cachedResults: [String: UInt64]?
     
     /// Virtual base address of the kernel image
     public let baseAddress: UInt64
@@ -28,22 +30,26 @@ open class KernelPatchfinder {
     public let runningUnderPiranha: Bool
     
     /// `__TEXT_EXEC,__text` section
-    public let textExec: PatchfinderSegment
+    public let textExec: PatchfinderSegment!
     
     /// `__TEXT,__cstring` section
-    public let cStrSect: PatchfinderSegment
+    public let cStrSect: PatchfinderSegment!
     
     /// `__DATA,__data` section
-    public let dataSect: PatchfinderSegment
+    public let dataSect: PatchfinderSegment!
     
     /// `__DATA_CONST,__const` section
-    public let constSect: PatchfinderSegment
+    public let constSect: PatchfinderSegment!
     
     /// `__PPLTEXT,__text` section
-    public let pplText: PatchfinderSegment
+    public let pplText: PatchfinderSegment!
     
     /// Address of allproc
     public lazy var allproc: UInt64? = {
+        if cachedResults != nil {
+            return cachedResults.unsafelyUnwrapped["allproc"]
+        }
+        
         // First find ref to string "shutdownwait"
         guard let shutdownwait = cStrSect.addrOf("shutdownwait") else {
             return nil
@@ -69,6 +75,10 @@ open class KernelPatchfinder {
     
     /// Address of the kernel's root translation table
     public lazy var cpu_ttep: UInt64? = {
+        if cachedResults != nil {
+            return cachedResults.unsafelyUnwrapped["cpu_ttep"]
+        }
+        
         // First follow the jump in start
         guard let start_first_cpu = AArch64Instr.Emulate.b(textExec.instruction(at: entryPoint) ?? 0, pc: entryPoint) else {
             return nil
@@ -87,6 +97,10 @@ open class KernelPatchfinder {
     
     /// Address of the `ppl_bootstrap_dispatch` function
     public lazy var ppl_bootstrap_dispatch: UInt64? = {
+        if cachedResults != nil {
+            return cachedResults.unsafelyUnwrapped["ppl_bootstrap_dispatch"]
+        }
+        
         guard let ppl_dispatch_failed = dataSect.addrOf("ppl_dispatch: failed") else {
             return nil
         }
@@ -125,6 +139,10 @@ open class KernelPatchfinder {
     
     /// Address of the `gxf_ppl_enter` function
     public lazy var gxf_ppl_enter: UInt64? = {
+        if cachedResults != nil {
+            return cachedResults.unsafelyUnwrapped["gxf_ppl_enter"]
+        }
+        
         guard let ppl_bootstrap_dispatch = ppl_bootstrap_dispatch else {
             return nil
         }
@@ -150,6 +168,10 @@ open class KernelPatchfinder {
     
     /// Address of the `pmap_enter_options_addr` function
     public lazy var pmap_enter_options_addr: UInt64? = {
+        if cachedResults != nil {
+            return cachedResults.unsafelyUnwrapped["pmap_enter_options_addr"]
+        }
+        
         guard let pmap_enter_options_ppl = pplDispatchFunc(forOperation: 0xA) else {
             return nil
         }
@@ -199,6 +221,10 @@ open class KernelPatchfinder {
     
     /// Address of the signed part of the `hw_lck_ticket_reserve_orig_allow_invalid` function
     public lazy var hw_lck_ticket_reserve_orig_allow_invalid_signed: UInt64? = {
+        if cachedResults != nil {
+            return cachedResults.unsafelyUnwrapped["hw_lck_ticket_reserve_orig_allow_invalid_signed"]
+        }
+        
         var pc: UInt64?
         while true {
             guard let candidate = textExec.addrOf([0x52800000, 0xD65F03C0], startAt: pc) else {
@@ -219,6 +245,10 @@ open class KernelPatchfinder {
     
     /// Address of the `hw_lck_ticket_reserve_orig_allow_invalid` function
     public lazy var hw_lck_ticket_reserve_orig_allow_invalid: UInt64? = {
+        if cachedResults != nil {
+            return cachedResults.unsafelyUnwrapped["hw_lck_ticket_reserve_orig_allow_invalid"]
+        }
+        
         guard let signed = hw_lck_ticket_reserve_orig_allow_invalid_signed else {
             return nil
         }
@@ -235,6 +265,10 @@ open class KernelPatchfinder {
     
     /// Address of a `br x22` gadget (first signs, then branches)
     public lazy var br_x22_gadget: UInt64? = {
+        if cachedResults != nil {
+            return cachedResults.unsafelyUnwrapped["br_x22_gadget"]
+        }
+        
         var pc: UInt64?
         while true {
             guard let candidate = textExec.addrOf([0xD71F0ADF], startAt: pc) else {
@@ -254,11 +288,19 @@ open class KernelPatchfinder {
     
     /// Address of `thread_exception_return`
     public lazy var exception_return: UInt64? = {
+        if cachedResults != nil {
+            return cachedResults.unsafelyUnwrapped["exception_return"]
+        }
+        
         return textExec.addrOf([0xD5034FDF, 0xD538D083, 0x910002BF])
     }()
     
     /// Address of `thread_exception_return` after checking the signed state
     public lazy var exception_return_after_check: UInt64? = {
+        if cachedResults != nil {
+            return cachedResults.unsafelyUnwrapped["exception_return_after_check"]
+        }
+        
         guard let exception_return = exception_return else {
             return nil
         }
@@ -268,6 +310,10 @@ open class KernelPatchfinder {
     
     /// Address of `thread_exception_return` after checking the signed state, without restoring lr and others
     public lazy var exception_return_after_check_no_restore: UInt64? = {
+        if cachedResults != nil {
+            return cachedResults.unsafelyUnwrapped["exception_return_after_check_no_restore"]
+        }
+        
         guard let exception_return_after_check = exception_return_after_check else {
             return nil
         }
@@ -277,16 +323,28 @@ open class KernelPatchfinder {
     
     /// Address of a `ldp x0, x1, [x8]` gadget
     public lazy var ldp_x0_x1_x8_gadget: UInt64? = {
+        if cachedResults != nil {
+            return cachedResults.unsafelyUnwrapped["ldp_x0_x1_x8_gadget"]
+        }
+        
         return textExec.addrOf([0xA9400500, 0xD65F03C0])
     }()
     
     /// Address of a `str x8, [x9]` gadget
     public lazy var str_x8_x9_gadget: UInt64? = {
+        if cachedResults != nil {
+            return cachedResults.unsafelyUnwrapped["str_x8_x9_gadget"]
+        }
+        
         return textExec.addrOf([0xF9000128, 0xD65F03C0])
     }()
     
     /// Address of a `str x0, [x19]; ldr x?, [x20, #?]` gadget
     public lazy var str_x0_x19_ldr_x20: UInt64? = {
+        if cachedResults != nil {
+            return cachedResults.unsafelyUnwrapped["str_x0_x19_ldr_x20"]
+        }
+        
         var pc: UInt64?
         while true {
             guard let candidate = textExec.addrOf([0xF9000260], startAt: pc) else {
@@ -305,11 +363,19 @@ open class KernelPatchfinder {
     
     /// Address of the `pmap_set_nested` function
     public lazy var pmap_set_nested: UInt64? = {
+        if cachedResults != nil {
+            return cachedResults.unsafelyUnwrapped["pmap_set_nested"]
+        }
+        
         return pplDispatchFunc(forOperation: 0x1A)
     }()
     
     /// Address of the `pmap_nest` function
     public lazy var pmap_nest: UInt64? = {
+        if cachedResults != nil {
+            return cachedResults.unsafelyUnwrapped["pmap_nest"]
+        }
+        
         guard let pmap_nest_ppl = pplDispatchFunc(forOperation: 0x11) else {
             return nil
         }
@@ -327,6 +393,10 @@ open class KernelPatchfinder {
     
     /// Address of the `pmap_remove_options` function
     public lazy var pmap_remove_options: UInt64? = {
+        if cachedResults != nil {
+            return cachedResults.unsafelyUnwrapped["pmap_remove_options"]
+        }
+        
         guard let pmap_remove_ppl = pplDispatchFunc(forOperation: 0x17) else {
             return nil
         }
@@ -351,11 +421,19 @@ open class KernelPatchfinder {
     
     /// Address of the `pmap_mark_page_as_ppl_page` function
     public lazy var pmap_mark_page_as_ppl_page: UInt64? = {
+        if cachedResults != nil {
+            return cachedResults.unsafelyUnwrapped["pmap_mark_page_as_ppl_page"]
+        }
+        
         return pplDispatchFunc(forOperation: 0x10)
     }()
     
     /// Address of the `pmap_create_options` function
     public lazy var pmap_create_options: UInt64? = {
+        if cachedResults != nil {
+            return cachedResults.unsafelyUnwrapped["pmap_create_options"]
+        }
+        
         guard let pmap_create_options_ppl = pplDispatchFunc(forOperation: 0x8) else {
             return nil
         }
@@ -382,6 +460,10 @@ open class KernelPatchfinder {
     
     /// Address of the `gIOCatalogue` object
     public lazy var gIOCatalogue: UInt64? = {
+        if cachedResults != nil {
+            return cachedResults.unsafelyUnwrapped["gIOCatalogue"]
+        }
+        
         guard let kConfigTablesStr = cStrSect.addrOf("KernelConfigTables syntax error: %s") else {
             return nil
         }
@@ -414,6 +496,10 @@ open class KernelPatchfinder {
     
     /// Address of the `IOCatalogue::terminateDriversForModule(const char * moduleName, bool unload)` function
     public lazy var terminateDriversForModule: UInt64? = {
+        if cachedResults != nil {
+            return cachedResults.unsafelyUnwrapped["terminateDriversForModule"]
+        }
+        
         guard let cantRemoveKextStr = cStrSect.addrOf("Can't remove kext %s - not found.") else {
             return nil
         }
@@ -482,6 +568,10 @@ open class KernelPatchfinder {
     
     /// Address of the `kalloc_data_external` function
     public lazy var kalloc_data_external: UInt64? = {
+        if cachedResults != nil {
+            return cachedResults.unsafelyUnwrapped["kalloc_data_external"]
+        }
+        
         // For kalloc, find "AMFI: %s: Failed to allocate memory for fatal error message, cannot produce a crash reason."
         // The first bl in the function will be to kalloc_data_external
         guard let amfi_fatal_err_str = cStrSect.addrOf("AMFI: %s: Failed to allocate memory for fatal error message, cannot produce a crash reason.") else {
@@ -520,11 +610,19 @@ open class KernelPatchfinder {
     
     /// Address of the `ml_sign_thread_state` function
     public lazy var ml_sign_thread_state: UInt64? = {
+        if cachedResults != nil {
+            return cachedResults.unsafelyUnwrapped["ml_sign_thread_state"]
+        }
+        
         return textExec.addrOf([0x9AC03021, 0x9262F842, 0x9AC13041, 0x9AC13061, 0x9AC13081, 0x9AC130A1, 0xF9009401, 0xD65F03C0])
     }()
     
     /// Address of the ppl handler table
     public lazy var ppl_handler_table: UInt64? = {
+        if cachedResults != nil {
+            return cachedResults.unsafelyUnwrapped["ppl_handler_table"]
+        }
+        
         guard let ppl_bootstrap_dispatch = ppl_bootstrap_dispatch else {
             return nil
         }
@@ -546,6 +644,10 @@ open class KernelPatchfinder {
     
     /// Address of `pmap_image4_trust_caches`
     public lazy var pmap_image4_trust_caches: UInt64? = {
+        if cachedResults != nil {
+            return cachedResults.unsafelyUnwrapped["pmap_image4_trust_caches"]
+        }
+        
         guard let ppl_handler_table = ppl_handler_table else {
             return nil
         }
@@ -579,6 +681,10 @@ open class KernelPatchfinder {
     
     /// Get the EL level the kernel runs at
     public lazy var kernel_el: UInt64? = {
+        if cachedResults != nil {
+            return cachedResults.unsafelyUnwrapped["kernel_el"]
+        }
+        
         // Get start
         guard let realStart = AArch64Instr.Emulate.b(textExec.instruction(at: entryPoint) ?? 0, pc: entryPoint) else {
             return nil
@@ -597,6 +703,10 @@ open class KernelPatchfinder {
     
     /// Offset of `TH_RECOVER` in thread struct
     public lazy var TH_RECOVER: UInt64? = {
+        if cachedResults != nil {
+            return cachedResults.unsafelyUnwrapped["TH_RECOVER"]
+        }
+        
         guard let lckFunc = hw_lck_ticket_reserve_orig_allow_invalid_signed else {
             return nil
         }
@@ -610,6 +720,10 @@ open class KernelPatchfinder {
     
     /// Offset of `TH_KSTACKPTR` in thread struct
     public lazy var TH_KSTACKPTR: UInt64? = {
+        if cachedResults != nil {
+            return cachedResults.unsafelyUnwrapped["TH_KSTACKPTR"]
+        }
+        
         var pc: UInt64?
         while true {
             guard let candidate = textExec.addrOf([0xD538D08A], startAt: pc) else {
@@ -628,6 +742,10 @@ open class KernelPatchfinder {
     
     /// Offset of `ACT_CONTEXT` in thread struct
     public lazy var ACT_CONTEXT: UInt64? = {
+        if cachedResults != nil {
+            return cachedResults.unsafelyUnwrapped["ACT_CONTEXT"]
+        }
+        
         var pc: UInt64?
         while true {
             guard let candidate = textExec.addrOf([0xD5184100, 0xA8C107E0, 0xD50040BF], startAt: pc) else {
@@ -644,6 +762,10 @@ open class KernelPatchfinder {
     
     /// Offset of `ACT_CPUDATAP` in thread struct
     public lazy var ACT_CPUDATAP: UInt64? = {
+        if cachedResults != nil {
+            return cachedResults.unsafelyUnwrapped["ACT_CPUDATAP"]
+        }
+        
         var pc: UInt64?
         while true {
             guard let candidate = textExec.addrOf([0xD50343DF], startAt: pc) else {
@@ -662,6 +784,10 @@ open class KernelPatchfinder {
     
     /// Offset of `ITK_SPACE` in task struct
     public lazy var ITK_SPACE: UInt64? = {
+        if cachedResults != nil {
+            return cachedResults.unsafelyUnwrapped["ITK_SPACE"]
+        }
+        
         guard let task_dealloc_str = cStrSect.addrOf("task_deallocate(%p): volatile_objects=%d nonvolatile_objects=%d") else {
             return nil
         }
@@ -698,6 +824,10 @@ open class KernelPatchfinder {
     
     /// Offset of `PMAP` in vm\_map struct
     public lazy var VM_MAP_PMAP: UInt64? = {
+        if cachedResults != nil {
+            return cachedResults.unsafelyUnwrapped["VM_MAP_PMAP"]
+        }
+        
         guard let control_access_str = cStrSect.addrOf("userspace has control access to a kernel") else {
             return nil
         }
@@ -722,6 +852,10 @@ open class KernelPatchfinder {
     
     /// Offset of `LABEL` in mach\_port struct
     public lazy var PORT_LABEL: UInt64? = {
+        if cachedResults != nil {
+            return cachedResults.unsafelyUnwrapped["PORT_LABEL"]
+        }
+        
         guard let label_check_str = cStrSect.addrOf("ipc_kobject_label_check: attempted receive right copyout for labeled kobject") else {
             return nil
         }
@@ -751,6 +885,14 @@ open class KernelPatchfinder {
     
     /// Find `ptov_table`, `gPhysBase` and `gVirtBase` for phys-to-virt translation
     public lazy var ptov_data: (table: UInt64, physBase: UInt64?, virtBase: UInt64?)? = {
+        if cachedResults != nil {
+            guard let table = cachedResults.unsafelyUnwrapped["ptov_data_table"] else {
+                return nil
+            }
+            
+            return (table: table, physBase: cachedResults.unsafelyUnwrapped["ptov_data_physBase"], virtBase: cachedResults.unsafelyUnwrapped["ptov_data_virtBase"])
+        }
+        
         guard let panic_str = cStrSect.addrOf("%s: illegal PA: 0x%llx; phys base 0x%llx, size 0x%llx @%s:%d") else {
             return nil
         }
@@ -804,6 +946,10 @@ open class KernelPatchfinder {
     
     /// `pmap_alloc_page_for_kern` function
     public lazy var pmap_alloc_page_for_kern: UInt64? = {
+        if cachedResults != nil {
+            return cachedResults.unsafelyUnwrapped["pmap_alloc_page_for_kern"]
+        }
+        
         guard let func_str = cStrSect.addrOf("pmap_alloc_page_for_kern") else {
             return nil
         }
@@ -820,6 +966,56 @@ open class KernelPatchfinder {
             pc -= 4
         }
     }()
+    
+    public func exportResults() -> Data? {
+        let results_opt = [
+            "baseAddress": baseAddress,
+            "entryPoint": entryPoint,
+            "allproc": allproc,
+            "cpu_ttep": cpu_ttep,
+            "ppl_bootstrap_dispatch": ppl_bootstrap_dispatch,
+            "gxf_ppl_enter": gxf_ppl_enter,
+            "pmap_enter_options_addr": pmap_enter_options_addr,
+            "hw_lck_ticket_reserve_orig_allow_invalid_signed": hw_lck_ticket_reserve_orig_allow_invalid_signed,
+            "hw_lck_ticket_reserve_orig_allow_invalid": hw_lck_ticket_reserve_orig_allow_invalid,
+            "br_x22_gadget": br_x22_gadget,
+            "exception_return": exception_return,
+            "exception_return_after_check": exception_return_after_check,
+            "exception_return_after_check_no_restore": exception_return_after_check_no_restore,
+            "ldp_x0_x1_x8_gadget": ldp_x0_x1_x8_gadget,
+            "str_x8_x9_gadget": str_x8_x9_gadget,
+            "str_x0_x19_ldr_x20": str_x0_x19_ldr_x20,
+            "pmap_set_nested": pmap_set_nested,
+            "pmap_nest": pmap_nest,
+            "pmap_remove_options": pmap_remove_options,
+            "pmap_mark_page_as_ppl_page": pmap_mark_page_as_ppl_page,
+            "pmap_create_options": pmap_create_options,
+            "gIOCatalogue": gIOCatalogue,
+            "terminateDriversForModule": terminateDriversForModule,
+            "kalloc_data_external": kalloc_data_external,
+            "ml_sign_thread_state": ml_sign_thread_state,
+            "ppl_handler_table": ppl_handler_table,
+            "pmap_image4_trust_caches": pmap_image4_trust_caches,
+            "kernel_el": kernel_el,
+            "TH_RECOVER": TH_RECOVER,
+            "TH_KSTACKPTR": TH_KSTACKPTR,
+            "ACT_CONTEXT": ACT_CONTEXT,
+            "ACT_CPUDATAP": ACT_CPUDATAP,
+            "ITK_SPACE": ITK_SPACE,
+            "VM_MAP_PMAP": VM_MAP_PMAP,
+            "PORT_LABEL": PORT_LABEL,
+            "ptov_data_table": ptov_data?.table,
+            "ptov_data_physBase": ptov_data?.physBase,
+            "ptov_data_virtBase": ptov_data?.virtBase,
+            "pmap_alloc_page_for_kern": pmap_alloc_page_for_kern
+        ]
+        
+        let results = results_opt.filter { (k, v) in
+            v != nil
+        }
+        
+        return try? PropertyListSerialization.data(fromPropertyList: results, format: .xml, options: 0)
+    }
 
     /// Return patchfinder for the currently running kernel.
     public static var running: KernelPatchfinder? = {
@@ -857,7 +1053,8 @@ open class KernelPatchfinder {
     
     /// Initialize patchfinder for the given kernel.
     public required init?(kernel: MachO) {
-        self.kernel = kernel
+        self.kernel        = kernel
+        self.cachedResults = nil
         
         guard let textExec = kernel.pfSection(segment: "__TEXT_EXEC", section: "__text") else {
             return nil
@@ -940,6 +1137,31 @@ open class KernelPatchfinder {
         self.baseAddress = baseAddress
         self.entryPoint = entryPoint
         self.runningUnderPiranha = runningUnderPiranha
+    }
+    
+    public init?(fromCachedResults cr: Data) {
+        guard let results = try? PropertyListSerialization.propertyList(from: cr, format: nil) as? [String: UInt64] else {
+            return nil
+        }
+        
+        guard let baseAddress = results["baseAddress"] else {
+            return nil
+        }
+        
+        guard let entryPoint = results["entryPoint"] else {
+            return nil
+        }
+        
+        self.baseAddress         = baseAddress
+        self.entryPoint          = entryPoint
+        self.cachedResults       = results
+        self.kernel              = nil
+        self.runningUnderPiranha = false
+        self.textExec            = nil
+        self.cStrSect            = nil
+        self.dataSect            = nil
+        self.constSect           = nil
+        self.pplText             = nil
     }
     
     public func pplDispatchFunc(forOperation op: UInt16) -> UInt64? {

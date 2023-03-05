@@ -150,9 +150,27 @@ public class Task: KernelObject {
         return VMMap(address: addr)
     }
     
+    public var firstThread: KThread? {
+        guard let addr = try? rPtr(offset: 0x60) else {
+            return nil
+        }
+        
+        return KThread(address: addr)
+    }
+    
     public func getKObject(ofPort port: mach_port_t) throws -> UInt64 {
         guard let addr = try itk_space?.is_table?.getKPort(ofPort: port)?.kObject else {
             throw KRWError.failedToGetKObject(ofPort: port)
+        }
+        
+        return addr
+    }
+}
+
+public class KThread: KernelObject {
+    public var actContext: UInt64? {
+        guard let addr = try? rPtr(offset: KRW.patchfinder.ACT_CONTEXT!) else {
+            return nil
         }
         
         return addr

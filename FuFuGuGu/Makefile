@@ -4,7 +4,7 @@ SDK_PATH=$(shell xcrun --sdk $(SDK) --show-sdk-path)
 TARGET=arm64e-apple-ios14.0
 CONFIG=debug
 
-SWIFTC_ARGS=-sdk "$(SDK_PATH)" -target $(TARGET) -O -framework IOKit -framework CoreServices -D__DARWIN_OPAQUE_ARM_THREAD_STATE64
+SWIFTC_ARGS=-sdk "$(SDK_PATH)" -target $(TARGET) -O -framework IOKit -framework CoreServices -lbsm -D__DARWIN_OPAQUE_ARM_THREAD_STATE64
 SWIFT_BUILD_ARGS=-c $(CONFIG) --product FuFuGuGu -Xcc "-DIOS_BUILD" -Xcc -target -Xcc $(TARGET) -Xcc -Wno-incompatible-sysroot $(addprefix -Xswiftc ,$(SWIFTC_ARGS))
 
 all: libFuFuGuGu.dylib

@@ -39,6 +39,10 @@ public extension KRW {
             let surface = try KRW.rPtr(virt: try KRW.ourProc!.task!.getKObject(ofPort: port) + 0x18 /* IOSurfaceSendRight -> IOSurface */)
             let va = try KRW.rPtr(virt: surface + 0x3e0 /* IOSurface -> IOSurfaceAddressRanges */)
             
+            if va == 0 {
+                continue
+            }
+            
             if (try? KRW.kvtophys(kv: va + allocSize)) != nil {
                 mach_port_deallocate(mach_task_self_, port)
                 continue

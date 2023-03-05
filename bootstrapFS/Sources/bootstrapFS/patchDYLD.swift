@@ -162,7 +162,7 @@ func patchDYLD(real: String, patched: String, trustCache: String) throws {
     for line in sigInfoLines {
         if line.starts(with: "CDHash=") {
             let hex = line.replacingOccurrences(of: "CDHash=", with: "")
-            cdHashes.append(hex.decodeHex()!)
+            cdHashes.append(hex.decodeHex()![..<20] + Data(fromObject: 2 as UInt16))
         }
     }
     

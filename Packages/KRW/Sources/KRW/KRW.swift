@@ -10,6 +10,7 @@ import Foundation
 import KRWC
 import KernelPatchfinder
 import iDownload
+import PatchfinderUtils
 
 public enum KRWError: Error {
     case failed(providerError: Int32)
@@ -36,6 +37,14 @@ public class KRW {
     public internal(set) static var physBase: UInt64 = 0
     public internal(set) static var virtBase: UInt64 = 0
     public internal(set) static var ttep: UInt64?
+    
+    internal static var signedState = Data()
+    internal static var actContext: UInt64!
+    internal static var mappedState: UnsafeMutablePointer<kRegisterState>!
+    internal static var scratchMemory: UInt64!
+    internal static var scratchMemoryMapped: UnsafeMutablePointer<UInt64>!
+    internal static var kernelStack: UInt64!
+    internal static var kcallThread: mach_port_t!
     
     public private(set) static var ourProc: Proc? = {
         try? Proc(pid: getpid())

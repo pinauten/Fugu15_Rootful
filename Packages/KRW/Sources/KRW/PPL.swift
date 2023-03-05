@@ -47,7 +47,7 @@ public extension KRW {
     
     static func initPPLBypass(inProcess pid: pid_t) throws -> Bool {
         guard let pmap = try Proc(pid: pid)?.task?.vmMap?.pmap else {
-            print("Failed to get jailbreakd pmap!")
+            print("Failed to get other process pmap!")
             return false
         }
         

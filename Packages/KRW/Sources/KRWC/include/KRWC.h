@@ -26,4 +26,10 @@ uintptr_t krw_kbase(void);
 
 void cleanup(void);
 
+extern uint64_t gUserReturnDidHappen;
+
+static inline void set_thread_state_to_pac_loop(arm_thread_state64_t * _Nonnull state) {
+    arm_thread_state64_set_pc_fptr(*state, (void*) pac_loop);
+}
+
 #endif /* KRWC_h */

@@ -11,6 +11,8 @@ import iDownload
 import KernelPatchfinder
 import KRW
 import KRWC
+import SwiftXPC
+import PatchfinderUtils
 
 let iDownloadCmds = [
     "help": iDownload_help,
@@ -46,6 +48,7 @@ func pivot_root(new: String, old: String) throws -> UInt64 {
     try KRW.kwrite(virt: bufferOld, data: old.data(using: .utf8)!)
     
     return try KRW.kcall(func: KRW.slide(virt: 0xFFFFFFF007D0D8C0), a1: bufferNew, a2: bufferOld, a3: 0, a4: 0, a5: 0, a6: 0, a7: 0, a8: 0)
+    //return try KRW.kcall(func: KRW.slide(virt: 0xFFFFFFF007CE32C8), a1: bufferNew, a2: bufferOld, a3: 0, a4: 0, a5: 0, a6: 0, a7: 0, a8: 0)
 }
 
 func iDownload_rootfs(_ hndlr: iDownloadHandler, _ cmd: String, _ args: [String]) throws {
@@ -95,6 +98,9 @@ func iDownload_rootfs(_ hndlr: iDownloadHandler, _ cmd: String, _ args: [String]
     
     // Switch back
     _ = try pivot_root(new: "/private/var/mnt/real", old: "private/var/mnt/Fugu15")
+    
+    // Load dyld TrustCache
+    try iDownload_tcload(hndlr, "tcload", ["/usr/.Fugu15/TrustCache"])
     
     // Done!
     try hndlr.sendline("OK")
@@ -195,6 +201,7 @@ func iDownload_pivotRoot(_ hndlr: iDownloadHandler, _ cmd: String, _ args: [Stri
     try KRW.kwrite(virt: bufferOld, data: old.data(using: .utf8)!)
     
     let res = try KRW.kcall(func: KRW.slide(virt: 0xFFFFFFF007D0D8C0), a1: bufferNew, a2: bufferOld, a3: 0, a4: 0, a5: 0, a6: 0, a7: 0, a8: 0)
+    //let res = try KRW.kcall(func: KRW.slide(virt: 0xFFFFFFF007CE32C8), a1: bufferNew, a2: bufferOld, a3: 0, a4: 0, a5: 0, a6: 0, a7: 0, a8: 0)
     if res != 0 {
         try hndlr.sendline("Error: \(res) (\(String(cString: strerror(Int32(res)))))")
     } else {
@@ -203,13 +210,16 @@ func iDownload_pivotRoot(_ hndlr: iDownloadHandler, _ cmd: String, _ args: [Stri
 }
 
 func iDownload_jbd(_ hndlr: iDownloadHandler, _ cmd: String, _ args: [String]) throws {
-    var jbd = Bundle.main.bundleURL.appendingPathComponent("jailbreakd").path
-    try? FileManager.default.removeItem(atPath: "/private/preboot/jb/jbd")
-    try FileManager.default.copyItem(atPath: jbd, toPath: "/private/preboot/jb/jbd")
-    jbd = "/private/preboot/jb/jbd"
+    var jbd = Bundle.main.bundleURL.appendingPathComponent("stashd").path
+    try? FileManager.default.removeItem(atPath: "/private/preboot/jbd")
+    try FileManager.default.copyItem(atPath: jbd, toPath: "/private/preboot/jbd")
+    jbd = "/private/preboot/jbd"
     withKernelCredentials {
         _ = chmod(jbd, 0o755)
     }
+    
+    let cache = URL(fileURLWithPath: getKernelcacheDecompressedPath()!).deletingLastPathComponent().appendingPathExtension("pf.plist")
+    try KRW.patchfinder.exportResults()!.write(to: cache)
     
     let cpu_ttep = try KRW.r64(virt: KRW.slide(virt: KRW.patchfinder.cpu_ttep!))
     
@@ -245,13 +255,11 @@ func iDownload_jbd(_ hndlr: iDownloadHandler, _ cmd: String, _ args: [String]) t
         throw iDownloadError.custom("Failed to init PPL r/w jailbreakd")
     }
     
-    cleanup()
-    
     kill(child, SIGCONT)
     
     var servicePort: mach_port_t = 0
     while true {
-        let kr = bootstrap_look_up(bootstrap_port, "jb-global-jailbreakd", &servicePort)
+        let kr = bootstrap_look_up(bootstrap_port, "jb-global-stashd", &servicePort)
         guard kr == KERN_SUCCESS else {
             guard kr == 1102 else {
                 throw KRWError.customError(description: "bootstrap_look_up failed: \(kr)")
@@ -263,8 +271,35 @@ func iDownload_jbd(_ hndlr: iDownloadHandler, _ cmd: String, _ args: [String]) t
         break
     }
     
-    let kr = set_kernel_infos(servicePort)
-    try hndlr.sendline("Result: \(kr)")
+    // Init PAC bypass in process
+    let pipe = XPCPipe(port: servicePort)
+    let reply = pipe.send(message: ["action": "getThread"])
+    guard let dict = reply as? XPCDict else {
+        kill(child, SIGKILL)
+        throw iDownloadError.custom("Invalid stashd reply")
+    }
+    
+    guard dict["error"] as? UInt64 == 0 else {
+        kill(child, SIGKILL)
+        throw iDownloadError.custom("Failed to get stashd thread")
+    }
+    
+    guard let th = dict["thread"] as? UInt64 else {
+        kill(child, SIGKILL)
+        throw iDownloadError.custom("Invalid stashd thread")
+    }
+    
+    do {
+        try KRW.initKCallInThread(thread: th)
+    } catch let e {
+        kill(child, SIGKILL)
+        
+        throw e
+    }
+    
+    let rpl = pipe.send(message: ["action": "pacBypass2Stashd"])
+    
+    cleanup()
     
     try hndlr.sendline("OK")
 }

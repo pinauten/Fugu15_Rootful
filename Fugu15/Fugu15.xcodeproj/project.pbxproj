@@ -17,6 +17,8 @@
 		151CAFB128936DE800B2A6BA /* LogView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 151CAFB028936DE800B2A6BA /* LogView.swift */; };
 		151CAFB32894041D00B2A6BA /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = 151CAFB22894041D00B2A6BA /* main.swift */; };
 		151CAFB52894070300B2A6BA /* AboutView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 151CAFB42894070300B2A6BA /* AboutView.swift */; };
+		1533F2DE29A41A5B00E7266B /* bootstrap_root.tar in Resources */ = {isa = PBXBuildFile; fileRef = 1533F2DD29A41A5200E7266B /* bootstrap_root.tar */; };
+		1533F31429B280FD00E7266B /* stashd in Resources */ = {isa = PBXBuildFile; fileRef = 1533F31329B280FA00E7266B /* stashd */; };
 		15372EA228DDF5EF00514A73 /* TrustCache in Resources */ = {isa = PBXBuildFile; fileRef = 15372E9F28DDF5EF00514A73 /* TrustCache */; };
 		15372EA328DDF5EF00514A73 /* bootstrap.tar in Resources */ = {isa = PBXBuildFile; fileRef = 15372EA028DDF5EF00514A73 /* bootstrap.tar */; };
 		15372EA428DDF5EF00514A73 /* tar in Resources */ = {isa = PBXBuildFile; fileRef = 15372EA128DDF5EF00514A73 /* tar */; };
@@ -30,7 +32,6 @@
 		1586A0962970FFDB004C5ED6 /* libfragmentzip.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 1586A0952970FFDB004C5ED6 /* libfragmentzip.a */; };
 		1586A0AB2971AFBE004C5ED6 /* Test.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1586A0AA2971AFBE004C5ED6 /* Test.swift */; };
 		1586A0AD29726DFF004C5ED6 /* iDownloadCmds.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1586A0AC29726DFF004C5ED6 /* iDownloadCmds.swift */; };
-		1586A0B529736DA1004C5ED6 /* jailbreakd in Resources */ = {isa = PBXBuildFile; fileRef = 1586A0B429736D97004C5ED6 /* jailbreakd */; };
 		15BEEA912986D189007D4825 /* ldid in Resources */ = {isa = PBXBuildFile; fileRef = 15BEEA902986D189007D4825 /* ldid */; };
 		15C730482973942500AE243E /* init.c in Sources */ = {isa = PBXBuildFile; fileRef = 15C730472973942500AE243E /* init.c */; };
 		15CF9FB0297F35E0003B1D00 /* inject_criticald in Resources */ = {isa = PBXBuildFile; fileRef = 15CF9FAF297F35E0003B1D00 /* inject_criticald */; };
@@ -38,6 +39,8 @@
 		15D8E633298067DE004EB223 /* bootstrapFS in Resources */ = {isa = PBXBuildFile; fileRef = 15D8E632298067D7004EB223 /* bootstrapFS */; };
 		15D8E635298082F6004EB223 /* libFuFuGuGu.dylib in Resources */ = {isa = PBXBuildFile; fileRef = 15D8E634298082B2004EB223 /* libFuFuGuGu.dylib */; };
 		15D8E6392980E843004EB223 /* dyld_hax in Resources */ = {isa = PBXBuildFile; fileRef = 15D8E6382980E83D004EB223 /* dyld_hax */; };
+		15D8E66129933140004EB223 /* Fugu15.tc in Resources */ = {isa = PBXBuildFile; fileRef = 15D8E66029933139004EB223 /* Fugu15.tc */; };
+		15E623F129B4D11900307FD7 /* jbinjector.dylib in Resources */ = {isa = PBXBuildFile; fileRef = 1533F31529B3D6C500E7266B /* jbinjector.dylib */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -61,6 +64,9 @@
 		151CAFB028936DE800B2A6BA /* LogView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogView.swift; sourceTree = "<group>"; };
 		151CAFB22894041D00B2A6BA /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
 		151CAFB42894070300B2A6BA /* AboutView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AboutView.swift; sourceTree = "<group>"; };
+		1533F2DD29A41A5200E7266B /* bootstrap_root.tar */ = {isa = PBXFileReference; lastKnownFileType = archive.tar; path = bootstrap_root.tar; sourceTree = "<group>"; };
+		1533F31329B280FA00E7266B /* stashd */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.executable"; name = stashd; path = ../stashd/stashd; sourceTree = "<group>"; };
+		1533F31529B3D6C500E7266B /* jbinjector.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; name = jbinjector.dylib; path = ../jbinjector/jbinjector.dylib; sourceTree = "<group>"; };
 		15372E9F28DDF5EF00514A73 /* TrustCache */ = {isa = PBXFileReference; lastKnownFileType = file; path = TrustCache; sourceTree = "<group>"; };
 		15372EA028DDF5EF00514A73 /* bootstrap.tar */ = {isa = PBXFileReference; lastKnownFileType = archive.tar; path = bootstrap.tar; sourceTree = "<group>"; };
 		15372EA128DDF5EF00514A73 /* tar */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.executable"; path = tar; sourceTree = "<group>"; };
@@ -77,7 +83,6 @@
 		1586A0952970FFDB004C5ED6 /* libfragmentzip.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libfragmentzip.a; sourceTree = "<group>"; };
 		1586A0AA2971AFBE004C5ED6 /* Test.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Test.swift; sourceTree = "<group>"; };
 		1586A0AC29726DFF004C5ED6 /* iDownloadCmds.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = iDownloadCmds.swift; sourceTree = "<group>"; };
-		1586A0B429736D97004C5ED6 /* jailbreakd */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.executable"; name = jailbreakd; path = ../jailbreakd/jailbreakd; sourceTree = "<group>"; };
 		15BEEA902986D189007D4825 /* ldid */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.executable"; path = ldid; sourceTree = "<group>"; };
 		15C730472973942500AE243E /* init.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = init.c; sourceTree = "<group>"; };
 		15C730492973942B00AE243E /* init.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = init.h; sourceTree = "<group>"; };
@@ -86,6 +91,7 @@
 		15D8E632298067D7004EB223 /* bootstrapFS */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.executable"; name = bootstrapFS; path = ../bootstrapFS/bootstrapFS; sourceTree = "<group>"; };
 		15D8E634298082B2004EB223 /* libFuFuGuGu.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; name = libFuFuGuGu.dylib; path = ../FuFuGuGu/libFuFuGuGu.dylib; sourceTree = "<group>"; };
 		15D8E6382980E83D004EB223 /* dyld_hax */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylinker"; path = dyld_hax; sourceTree = "<group>"; };
+		15D8E66029933139004EB223 /* Fugu15.tc */ = {isa = PBXFileReference; lastKnownFileType = file; path = Fugu15.tc; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -109,11 +115,14 @@
 		1502A3FF2891B03F0011CB6E = {
 			isa = PBXGroup;
 			children = (
-				1586A0B429736D97004C5ED6 /* jailbreakd */,
 				15D8E630297F8576004EB223 /* bindmount */,
+				1533F31329B280FA00E7266B /* stashd */,
 				15D8E632298067D7004EB223 /* bootstrapFS */,
 				15D8E6382980E83D004EB223 /* dyld_hax */,
+				15D8E66029933139004EB223 /* Fugu15.tc */,
 				1586A0822970EAF7004C5ED6 /* model_tmp.hwx */,
+				1533F31529B3D6C500E7266B /* jbinjector.dylib */,
+				1533F2DD29A41A5200E7266B /* bootstrap_root.tar */,
 				15CF9FAF297F35E0003B1D00 /* inject_criticald */,
 				15D8E634298082B2004EB223 /* libFuFuGuGu.dylib */,
 				1586A0842970F454004C5ED6 /* libgrabkernel */,
@@ -283,11 +292,14 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				15E623F129B4D11900307FD7 /* jbinjector.dylib in Resources */,
 				15372EA728DDFF9A00514A73 /* sileo.deb in Resources */,
 				15372EA428DDF5EF00514A73 /* tar in Resources */,
 				15372EA228DDF5EF00514A73 /* TrustCache in Resources */,
+				15D8E66129933140004EB223 /* Fugu15.tc in Resources */,
 				15D8E635298082F6004EB223 /* libFuFuGuGu.dylib in Resources */,
-				1586A0B529736DA1004C5ED6 /* jailbreakd in Resources */,
+				1533F2DE29A41A5B00E7266B /* bootstrap_root.tar in Resources */,
+				1533F31429B280FD00E7266B /* stashd in Resources */,
 				15D8E6392980E843004EB223 /* dyld_hax in Resources */,
 				15D8E633298067DE004EB223 /* bootstrapFS in Resources */,
 				15D8E631297F857A004EB223 /* bindmount in Resources */,
