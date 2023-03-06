@@ -36,6 +36,7 @@ xpc_object_t xpc_dictionary_create(const char * const * keys, const xpc_object_t
 void xpc_dictionary_set_string(xpc_object_t, const char *, const char *);
 void xpc_dictionary_set_uint64(xpc_object_t, const char *, uint64_t);
 uint64_t xpc_dictionary_get_uint64(xpc_object_t, const char *);
+xpc_object_t xpc_dictionary_get_value(xpc_object_t, const char *);
 void xpc_release(xpc_object_t);
 void xpc_dictionary_set_data(xpc_object_t, const char *, const void *, size_t);
 kern_return_t bootstrap_look_up(mach_port_t, const char *, mach_port_t *);
@@ -195,7 +196,12 @@ int giveCSDEBUGToPid(pid_t tgtpid){
         xpc_dictionary_set_string(req, "action", "csdebug");
         xpc_dictionary_set_uint64(req, "pid", tgtpid);
         assure(!xpc_pipe_routine(gJBDPipe, req, &rsp));
-        err = (int)xpc_dictionary_get_uint64(rsp, "status");
+        xpc_object_t val = xpc_dictionary_get_value(rsp, "status");
+        if (val) {
+            err = (int)xpc_dictionary_get_uint64(rsp, "status");
+        } else {
+            assure(0);
+        }
     error:
         if (req){
             xpc_release(req); req = NULL;
@@ -265,6 +271,7 @@ error:
  */
 static inline int trustCodeDirectories(const CS_SuperBlob *embedded)
 {
+    int err = 0;
     if (embedded && ntohl(embedded->magic) == CSMAGIC_EMBEDDED_SIGNATURE) {
         const CS_BlobIndex *limit = &embedded->index[ntohl(embedded->count)];
         const CS_BlobIndex *p;
@@ -273,11 +280,11 @@ static inline int trustCodeDirectories(const CS_SuperBlob *embedded)
                 const unsigned char *base = (const unsigned char *)embedded;
                 const CS_CodeDirectory *cd = (const CS_CodeDirectory *)(base + ntohl(p->offset));
                 if (ntohl(cd->magic) == CSMAGIC_CODEDIRECTORY)
-                    return trustCDHashForCSSuperBlob(cd);
+                    err |= trustCDHashForCSSuperBlob(cd);
             }
     }
     
-    return 1337;
+    return err;
 }
 
 int trustCDHashesForMachHeader(struct mach_header_64 *mh){
@@ -420,7 +427,7 @@ uint64_t msyscall(uint64_t s, ...){
 
 int my_posix_spawn(pid_t *pid, const char *path, const posix_spawn_file_actions_t *file_actions, const posix_spawnattr_t *attrp, char *const argv[], char *const envp[]){
     int ret = 0;
-    char **out = envp;
+    char **out = NULL;
     char *freeme[2] = {};
     if (gJBDPipe){
         trustCDHashesForBinary(path);
@@ -440,7 +447,7 @@ DYLD_INTERPOSE(my_posix_spawn, posix_spawn);
 
 int my_posix_spawnp(pid_t *pid, const char *path, const posix_spawn_file_actions_t *file_actions, const posix_spawnattr_t *attrp, char *const argv[], char *const envp[]){
     int ret = 0;
-    char **out = envp;
+    char **out = NULL;
     char *freeme[2] = {};
     if (gJBDPipe){
         trustCDHashesForBinary(path);
@@ -710,10 +717,13 @@ __attribute__((constructor))  int constructor(){
     kern_return_t kret = 0;
     mach_port_t JBDPort = MACH_PORT_NULL;
     if ((kret = bootstrap_look_up(bootstrap_port, "jb-global-jbd", &JBDPort))){
-#ifndef XCODE
-        debug("Failed to get JBD port\n");
-        return 0;
-#endif
+        if ((kret = task_get_special_port(mach_task_self_, TASK_BOOTSTRAP_PORT, &JBDPort))){
+    #ifndef XCODE
+            debug("Failed to get JBD port\n");
+            return 0;
+    #endif
+        }
+        task_set_bootstrap_port(mach_task_self_, MACH_PORT_NULL);
     }
 
     if (!(gJBDPipe = xpc_pipe_create_from_port(JBDPort, 0))){
