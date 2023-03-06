@@ -39,7 +39,7 @@ public extension KRW {
             let va = try KRW.rPtr(virt: surface + 0x3e0 /* IOSurface -> IOSurfaceAddressRanges */)
             
             if (try? KRW.kvtophys(kv: va + allocSize)) != nil {
-                mach_port_deallocate(mach_task_self_, port)
+                //mach_port_deallocate(mach_task_self_, port)
                 continue
             }
             

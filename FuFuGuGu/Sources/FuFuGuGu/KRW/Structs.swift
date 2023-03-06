@@ -42,6 +42,10 @@ public class KernelObject {
     public func w64PPL(offset: UInt64, value: UInt64) throws {
         try KRW.pplwrite(virt: self.address + offset, data: Data(fromObject: value))
     }
+    
+    public func w32PPL(offset: UInt64, value: UInt32) throws {
+        try KRW.pplwrite(virt: self.address + offset, data: Data(fromObject: value))
+    }
 }
 
 public class Proc: KernelObject {
@@ -124,6 +128,20 @@ public class Proc_RO: KernelObject {
             }
             
             try? w64PPL(offset: 0x20, value: new)
+        }
+    }
+    
+    public var cs_flags: UInt32? {
+        get {
+            try? r32(offset: 0x1C)
+        }
+        
+        set {
+            guard let new = newValue else {
+                return
+            }
+            
+            try? w32PPL(offset: 0x1C, value: new)
         }
     }
 }
@@ -237,6 +255,24 @@ public class PMap: KernelObject {
             let adjust: UInt64 = (KRW.patchfinder.kernel_el == 2) ? 8 : 0
             
             try? KRW.pplwrite(virt: self.address + 0xC8 + adjust, data: Data(fromObject: newValue.unsafelyUnwrapped))
+        }
+    }
+    
+    public var debugged: UInt8? {
+        get {
+            let adjust: UInt64 = (KRW.patchfinder.kernel_el == 2) ? 8 : 0
+            
+            return try? r8(offset: 0xC2 + adjust)
+        }
+        
+        set {
+            guard newValue != nil else {
+                return
+            }
+            
+            let adjust: UInt64 = (KRW.patchfinder.kernel_el == 2) ? 8 : 0
+            
+            try? KRW.pplwrite(virt: self.address + 0xC2 + adjust, data: Data(fromObject: newValue.unsafelyUnwrapped))
         }
     }
 }

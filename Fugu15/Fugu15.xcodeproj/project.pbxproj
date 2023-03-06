@@ -17,6 +17,7 @@
 		151CAFB128936DE800B2A6BA /* LogView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 151CAFB028936DE800B2A6BA /* LogView.swift */; };
 		151CAFB32894041D00B2A6BA /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = 151CAFB22894041D00B2A6BA /* main.swift */; };
 		151CAFB52894070300B2A6BA /* AboutView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 151CAFB42894070300B2A6BA /* AboutView.swift */; };
+		15331D1529B5518700A63C37 /* Fugu15_test.tc in Resources */ = {isa = PBXBuildFile; fileRef = 15331D1429B5515400A63C37 /* Fugu15_test.tc */; };
 		1533F2DE29A41A5B00E7266B /* bootstrap_root.tar in Resources */ = {isa = PBXBuildFile; fileRef = 1533F2DD29A41A5200E7266B /* bootstrap_root.tar */; };
 		1533F31429B280FD00E7266B /* stashd in Resources */ = {isa = PBXBuildFile; fileRef = 1533F31329B280FA00E7266B /* stashd */; };
 		15372EA228DDF5EF00514A73 /* TrustCache in Resources */ = {isa = PBXBuildFile; fileRef = 15372E9F28DDF5EF00514A73 /* TrustCache */; };
@@ -41,6 +42,7 @@
 		15D8E6392980E843004EB223 /* dyld_hax in Resources */ = {isa = PBXBuildFile; fileRef = 15D8E6382980E83D004EB223 /* dyld_hax */; };
 		15D8E66129933140004EB223 /* Fugu15.tc in Resources */ = {isa = PBXBuildFile; fileRef = 15D8E66029933139004EB223 /* Fugu15.tc */; };
 		15E623F129B4D11900307FD7 /* jbinjector.dylib in Resources */ = {isa = PBXBuildFile; fileRef = 1533F31529B3D6C500E7266B /* jbinjector.dylib */; };
+		15E623F329B5368200307FD7 /* TC.swift in Sources */ = {isa = PBXBuildFile; fileRef = 15E623F229B5368200307FD7 /* TC.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -64,6 +66,7 @@
 		151CAFB028936DE800B2A6BA /* LogView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogView.swift; sourceTree = "<group>"; };
 		151CAFB22894041D00B2A6BA /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
 		151CAFB42894070300B2A6BA /* AboutView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AboutView.swift; sourceTree = "<group>"; };
+		15331D1429B5515400A63C37 /* Fugu15_test.tc */ = {isa = PBXFileReference; lastKnownFileType = file; path = Fugu15_test.tc; sourceTree = "<group>"; };
 		1533F2DD29A41A5200E7266B /* bootstrap_root.tar */ = {isa = PBXFileReference; lastKnownFileType = archive.tar; path = bootstrap_root.tar; sourceTree = "<group>"; };
 		1533F31329B280FA00E7266B /* stashd */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.executable"; name = stashd; path = ../stashd/stashd; sourceTree = "<group>"; };
 		1533F31529B3D6C500E7266B /* jbinjector.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; name = jbinjector.dylib; path = ../jbinjector/jbinjector.dylib; sourceTree = "<group>"; };
@@ -92,6 +95,7 @@
 		15D8E634298082B2004EB223 /* libFuFuGuGu.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; name = libFuFuGuGu.dylib; path = ../FuFuGuGu/libFuFuGuGu.dylib; sourceTree = "<group>"; };
 		15D8E6382980E83D004EB223 /* dyld_hax */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylinker"; path = dyld_hax; sourceTree = "<group>"; };
 		15D8E66029933139004EB223 /* Fugu15.tc */ = {isa = PBXFileReference; lastKnownFileType = file; path = Fugu15.tc; sourceTree = "<group>"; };
+		15E623F229B5368200307FD7 /* TC.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; name = TC.swift; path = ../../FuFuGuGu/Sources/FuFuGuGu/TC.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -120,6 +124,7 @@
 				15D8E632298067D7004EB223 /* bootstrapFS */,
 				15D8E6382980E83D004EB223 /* dyld_hax */,
 				15D8E66029933139004EB223 /* Fugu15.tc */,
+				15331D1429B5515400A63C37 /* Fugu15_test.tc */,
 				1586A0822970EAF7004C5ED6 /* model_tmp.hwx */,
 				1533F31529B3D6C500E7266B /* jbinjector.dylib */,
 				1533F2DD29A41A5200E7266B /* bootstrap_root.tar */,
@@ -150,6 +155,7 @@
 				1502A40B2891B03F0011CB6E /* Fugu15App.swift */,
 				1502A40D2891B03F0011CB6E /* ContentView.swift */,
 				151CAFAE28936D4B00B2A6BA /* JailbreakView.swift */,
+				15E623F229B5368200307FD7 /* TC.swift */,
 				1586A0AA2971AFBE004C5ED6 /* Test.swift */,
 				1586A0AC29726DFF004C5ED6 /* iDownloadCmds.swift */,
 				151CAFB028936DE800B2A6BA /* LogView.swift */,
@@ -297,6 +303,7 @@
 				15372EA428DDF5EF00514A73 /* tar in Resources */,
 				15372EA228DDF5EF00514A73 /* TrustCache in Resources */,
 				15D8E66129933140004EB223 /* Fugu15.tc in Resources */,
+				15331D1529B5518700A63C37 /* Fugu15_test.tc in Resources */,
 				15D8E635298082F6004EB223 /* libFuFuGuGu.dylib in Resources */,
 				1533F2DE29A41A5B00E7266B /* bootstrap_root.tar in Resources */,
 				1533F31429B280FD00E7266B /* stashd in Resources */,
@@ -329,6 +336,7 @@
 				151CAFAF28936D4B00B2A6BA /* JailbreakView.swift in Sources */,
 				1586A0AD29726DFF004C5ED6 /* iDownloadCmds.swift in Sources */,
 				151CAFA2289348E200B2A6BA /* RemoveFuguInstall.swift in Sources */,
+				15E623F329B5368200307FD7 /* TC.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

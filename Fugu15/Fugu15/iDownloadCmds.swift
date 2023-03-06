@@ -24,14 +24,30 @@ let iDownloadCmds = [
     "stealCreds": iDownload_stealCreds,
     "env": iDownload_env,
     "chmod": iDownload_chmod,
-    "jbd": iDownload_jbd,
+    "stashd": iDownload_stashd,
     "pivot_root": iDownload_pivotRoot,
     "rsc": iDownload_rsc,
     "hax": iDownload_hax,
     "installDYLD": iDownload_installDYLD,
     "unhax": iDownload_unhax,
-    "rootfs": iDownload_rootfs
+    "rootfs": iDownload_rootfs,
+    "doit": iDownload_doit,
+    "test": iDownload_test
 ] as [String: iDownloadCmd]
+
+func iDownload_test(_ hndlr: iDownloadHandler, _ cmd: String, _ args: [String]) throws {
+    let cpu_ttep = try KRW.r64(virt: KRW.slide(virt: KRW.patchfinder.cpu_ttep!))
+    
+    try KRW.initPPLBypass(inProcess: getpid())
+    
+    PPLRW.initialize(magicPage: PPL_MAP_ADDR, cpuTTEP: cpu_ttep)
+    
+    let tc = TrustCache()
+    
+    tc?.append(hash: Data(repeating: 0x11, count: 20))
+    tc?.append(hash: Data(repeating: 0x22, count: 20))
+    tc?.append(hash: Data(repeating: 0x01, count: 20))
+}
 
 func iDownload_help(_ hndlr: iDownloadHandler, _ cmd: String, _ args: [String]) throws {
     try hndlr.sendline("tcload <path to TrustCache>: Load a TrustCache")
@@ -209,14 +225,50 @@ func iDownload_pivotRoot(_ hndlr: iDownloadHandler, _ cmd: String, _ args: [Stri
     }
 }
 
-func iDownload_jbd(_ hndlr: iDownloadHandler, _ cmd: String, _ args: [String]) throws {
-    var jbd = Bundle.main.bundleURL.appendingPathComponent("stashd").path
-    try? FileManager.default.removeItem(atPath: "/private/preboot/jbd")
-    try FileManager.default.copyItem(atPath: jbd, toPath: "/private/preboot/jbd")
-    jbd = "/private/preboot/jbd"
+func iDownload_doit(_ hndlr: iDownloadHandler, _ cmd: String, _ args: [String]) throws {
+    try iDownload_tcload(hndlr, "tcload", [Bundle.main.bundleURL.appendingPathComponent("Fugu15_test.tc").path])
+    
+    try iDownload_rootfs(hndlr, "rootfs", ["/dev/disk0s1s9", "/dev/disk0s1s10", "/dev/disk0s1s11", "/dev/disk0s1s12", "/dev/disk0s1s13", "/dev/disk0s1s14"])
+    
+    let FuFuGuGu = Bundle.main.bundleURL.appendingPathComponent("libFuFuGuGu.dylib").path
+    let jbinjector = Bundle.main.bundleURL.appendingPathComponent("jbinjector.dylib").path
+    let stashd = Bundle.main.bundleURL.appendingPathComponent("stashd").path
+    let inject_criticald = Bundle.main.bundleURL.appendingPathComponent("inject_criticald").path
+    
+    try? FileManager.default.removeItem(atPath: "/usr/lib/libFuFuGuGu.dylib")
+    try? FileManager.default.removeItem(atPath: "/usr/lib/jbinjector.dylib")
+    try? FileManager.default.removeItem(atPath: "/usr/bin/stashd")
+    try? FileManager.default.removeItem(atPath: "/usr/bin/inject_criticald")
+    
+    try FileManager.default.copyItem(atPath: FuFuGuGu, toPath: "/usr/lib/libFuFuGuGu.dylib")
+    try FileManager.default.copyItem(atPath: jbinjector, toPath: "/usr/lib/jbinjector.dylib")
+    try FileManager.default.copyItem(atPath: stashd, toPath: "/usr/bin/stashd")
+    try FileManager.default.copyItem(atPath: inject_criticald, toPath: "/usr/bin/inject_criticald")
+    
     withKernelCredentials {
-        _ = chmod(jbd, 0o755)
+        _ = chown("/usr/lib/libFuFuGuGu.dylib", 0, 0)
+        _ = chown("/usr/lib/jbinjector.dylib", 0, 0)
+        _ = chown("/usr/bin/stashd", 0, 0)
+        _ = chown("/usr/bin/inject_criticald", 0, 0)
+        
+        _ = chmod("/usr/lib/libFuFuGuGu.dylib", 0o755)
+        _ = chmod("/usr/lib/jbinjector.dylib", 0o755)
+        _ = chmod("/usr/bin/stashd", 0o755)
+        _ = chmod("/usr/bin/inject_criticald", 0o755)
     }
+    
+    try iDownload_stashd(hndlr, "stashd", [])
+    _ = try hndlr.exec("/usr/bin/inject_criticald", args: ["1", "/usr/lib/libFuFuGuGu.dylib"])
+    
+    cleanup()
+    
+    dlopen("/usr/lib/jbinjector.dylib", RTLD_NOW)
+    
+    try hndlr.sendline("OK")
+}
+
+func iDownload_stashd(_ hndlr: iDownloadHandler, _ cmd: String, _ args: [String]) throws {
+    let stashd = "/usr/bin/stashd"
     
     let cache = URL(fileURLWithPath: getKernelcacheDecompressedPath()!).deletingLastPathComponent().appendingPathExtension("pf.plist")
     try KRW.patchfinder.exportResults()!.write(to: cache)
@@ -224,7 +276,7 @@ func iDownload_jbd(_ hndlr: iDownloadHandler, _ cmd: String, _ args: [String]) t
     let cpu_ttep = try KRW.r64(virt: KRW.slide(virt: KRW.patchfinder.cpu_ttep!))
     
     let cArgs: [UnsafeMutablePointer<CChar>?] = try [
-        strdup(jbd),
+        strdup(stashd),
         strdup("launchedByFugu15"),
         strdup(String(KRW.kbase())),
         strdup(String(KRW.kslide())),

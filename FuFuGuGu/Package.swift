@@ -30,9 +30,15 @@ let package = Package(
         .target(name: "CBridge"),
         .target(
             name: "FuFuGuGu",
-            dependencies: ["CBridge", "SwiftUtils", "SwiftMachO", "SwiftXPC", "KernelPatchfinder"]),
+            dependencies: ["CBridge", "SwiftUtils", "SwiftMachO", "SwiftXPC", "KernelPatchfinder"],
+            linkerSettings: [
+                .linkedFramework("IOKit"),
+                .linkedLibrary("bsm")
+            ]
+        ),
         .executableTarget(
             name: "FuFuGuGuTest",
-            dependencies: ["FuFuGuGu"]),
+            dependencies: ["FuFuGuGu"]
+        ),
     ]
 )

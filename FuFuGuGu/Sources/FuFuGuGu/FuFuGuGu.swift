@@ -8,6 +8,8 @@
 import Foundation
 import CBridge
 import SwiftUtils
+
+@testable
 import SwiftXPC
 
 var console: Int32 = 0
@@ -21,8 +23,92 @@ func log(_ str: String) {
     //sleep(1)
 }
 
+/*
+                            0x36001025
+ #define CS_HARD            0x00000100  /* don't load invalid pages */
+ #define CS_KILL            0x00000200  /* kill process if it becomes invalid */
+ #define CS_RESTRICT        0x00000800  /* tell dyld to treat restricted */
+ #define CS_ENFORCEMENT     0x00001000  /* require enforcement */
+ #define CS_REQUIRE_LV      0x00002000  /* require library validation */
+ #define CS_PLATFORM_BINARY 0x04000000  /* this is a platform binary */
+ */
+
 func handleXPC(request: XPCDict, reply: XPCDict) -> UInt64 {
-    print("Got an XPC request!")
+    if let action = request["action"] as? String {
+        console = open("/dev/console",O_RDWR)
+        log("Got action \(action)")
+        switch action {
+        case "csdebug":
+            if let pid = request["pid"] as? UInt64 {
+                let proc = try? Proc(pid: pid_t(pid))
+                if let proc_ro = proc?.ro {
+                    if let flags = proc_ro.cs_flags {
+                        proc_ro.cs_flags = (flags & ~0x702b10) | 0x10000024
+                        guard let pmap = proc?.task?.vmMap?.pmap else {
+                            return 4
+                        }
+                        
+                        pmap.debugged = 1
+                        
+                        return 0
+                    } else {
+                        return 3
+                    }
+                } else {
+                    return 2
+                }
+            } else {
+                return 1
+            }
+            
+        case "trustcdhash":
+            log("Doing trustcdhash")
+            if let type = request["hashtype"] as? UInt64 {
+                log("hashtype: \(type)")
+                if type == 2 {
+                    if let data = request["hashdata"] as? Data {
+                        log("hashdata: \(data)")
+                        guard data.count >= 20 else {
+                            return 3
+                        }
+                        
+                        log("Good length")
+                        
+                        if TrustCache.currentTrustCache == nil {
+                            TrustCache.initialize()
+                            if TrustCache.currentTrustCache == nil {
+                                TrustCache.currentTrustCache = TrustCache()
+                            }
+                        }
+                        
+                        log("I haz initited")
+                        
+                        guard let tc = TrustCache.currentTrustCache else {
+                            return 4
+                        }
+                        
+                        log("I haz current")
+                        
+                        guard tc.append(hash: data[0..<20]) else {
+                            return 5
+                        }
+                        
+                        log("I haz appended")
+                        
+                        return 0
+                    }
+                    
+                    return 2
+                }
+                
+                return 1
+            }
+            
+        default:
+            break
+        }
+    }
+    
     return 0
 }
 
@@ -71,6 +157,8 @@ public func swift_init(_ consoleFD: Int32, _ servicePort: mach_port_t, _ XPCServ
             try KRW.receiveKCall(thPort: kcallTh)
             
             log("Got PPL and PAC bypass!")
+            
+            _ = pipe.send(message: ["action": "exit"])
         }
         
         // Start KRW Server
@@ -100,7 +188,7 @@ public func swift_init(_ consoleFD: Int32, _ servicePort: mach_port_t, _ XPCServ
                 
                 defer { XPCPipe.reply(dict: reply) }
                 
-                reply["STATUS"] = handleXPC(request: request, reply: reply)
+                reply["status"] = handleXPC(request: request, reply: reply)
             }
         }
         

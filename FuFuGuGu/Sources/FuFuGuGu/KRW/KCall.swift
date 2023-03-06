@@ -56,53 +56,53 @@ public extension KRW {
     static func receiveKCall(thPort: mach_port_t) throws {
         let CPSR_KERN_INTR_EN: UInt32 = 0x401000 | UInt32(patchfinder.kernel_el! << 2)
         
-        print("1")
+        log("1")
         
         let th = try ourProc!.task!.getKObject(ofPort: thPort)
         let thread = KThread(address: th)
         let actContext = thread.actContext.unsafelyUnwrapped
         
-        print("2")
+        log("2")
         
         let stack = try alloc(size: 0x4000 * 4)  + 0x8000
         let stackMapped = try map(virt: stack, size: 0x4000)
         let mappedState = stackMapped!.assumingMemoryBound(to: kRegisterState.self)
         
-        print("3")
+        log("3")
         
         // Use str x8, [x9] gadget to set TH_KSTACKPTR
         try w64(virt: actContext + offsetof(\kRegisterState.x.8), value: stack + 0x10)
         try w64(virt: actContext + offsetof(\kRegisterState.x.9), value: th + patchfinder.TH_KSTACKPTR.unsafelyUnwrapped)
         
-        print("4")
+        log("4")
         
         // SP and x0 should both point to the new CPU state
         try w64(virt: actContext + offsetof(\kRegisterState.sp), value: stack)
         try w64(virt: actContext + offsetof(\kRegisterState.x.0), value: stack)
         
-        print("5")
+        log("5")
         
         // x2 -> new cpsr
         // Include in signed state since it is rarely changed
         try w64(virt: actContext + offsetof(\kRegisterState.x.2), value: UInt64(CPSR_KERN_INTR_EN))
         
-        print("6")
+        log("6")
         
         // Create a copy of this state
         signedState = try kread(virt: actContext, size: MemoryLayout<kRegisterState>.size)
         
-        print("7")
+        log("7")
         
         // Set a custom recovery handler
         let hw_lck_ticket_reserve_orig_allow_invalid = try slide(virt: patchfinder.hw_lck_ticket_reserve_orig_allow_invalid!) + 0x4
         
-        print("8")
+        log("8")
         
         // x1 -> new pc
         // x3 -> new lr
         try w64(virt: actContext + offsetof(\kRegisterState.x.1), value: hw_lck_ticket_reserve_orig_allow_invalid)
         
-        print("9")
+        log("9")
         
         // New state
         // Force a data abort in hw_lck_ticket_reserve_orig_allow_invalid
@@ -128,7 +128,7 @@ public extension KRW {
         thread_resume(thPort)
         
         // Wait for flag to be set
-        while gUserReturnDidHappen == 0 { }
+        while gUserReturnDidHappen == 0 { usleep(1000) }
         
         // Stop thread
         thread_suspend(thPort)
@@ -170,7 +170,7 @@ public extension KRW {
         mappedState.pointee.x.21 = userReturnThreadContext!
         
         // Also need to set sp
-        mappedState.pointee.sp = kernelStack;
+        mappedState.pointee.sp = kernelStack
         
         // Set args
         mappedState.pointee.x.0 = a1;
@@ -193,11 +193,11 @@ public extension KRW {
         thread_resume(kcallThread);
         
         // Wait for flag to be set
-        while gUserReturnDidHappen == 0 { }
+        while gUserReturnDidHappen == 0 { usleep(1000) }
         
         // Stop thread
-        thread_suspend(kcallThread);
-        thread_abort(kcallThread);
+        thread_suspend(kcallThread)
+        thread_abort(kcallThread)
         
         // Sync all changes
         // (Probably not required)

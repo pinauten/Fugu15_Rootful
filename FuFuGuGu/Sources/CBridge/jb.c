@@ -12,6 +12,13 @@
 #include <sys/mount.h>
 #include <xpc/xpc.h>
 #include <bootstrap.h>
+#include <CommonCrypto/CommonDigest.h>
+#include <mach-o/loader.h>
+#include <mach-o/fat.h>
+#include <mach-o/dyld_images.h>
+#include <mach-o/nlist.h>
+#include <sys/stat.h>
+#include <xpc/xpc.h>
 
 #include "init.h"
 
@@ -34,6 +41,14 @@ void xpc_dictionary_get_audit_token(xpc_object_t, audit_token_t *);
 #pragma clang diagnostic ignored "-Wavailability"
 pid_t audit_token_to_pid(audit_token_t atoken) API_AVAILABLE(ios(15));
 int audit_token_to_pidversion(audit_token_t atoken) API_AVAILABLE(ios(15));
+
+void swift_reboot_hook(int console_fd);
+
+typedef xpc_object_t xpc_pipe_t;
+xpc_pipe_t xpc_pipe_create_from_port(mach_port_t port, uint64_t flags);
+int xpc_pipe_routine(xpc_pipe_t pipe, xpc_object_t request, xpc_object_t* reply);
+
+xpc_pipe_t gJBDPipe = NULL;
 
 void *my_malloc(size_t sz) {
     int fd_console = open("/dev/console",O_RDWR,0);
@@ -96,16 +111,12 @@ int my_kill(pid_t pid, int sig) {
     if (pid == -1 && sig == SIGKILL){
         int fd_console = open("/dev/console", O_RDWR, 0);
         dprintf(fd_console, "Launchd is about to restart userspace (hopefully!), doing execve...\n");
-        if (bp != 0) {
-            kern_return_t kr = task_set_bootstrap_port(mach_task_self_, bp);
-            if (kr != KERN_SUCCESS) {
-                dprintf(fd_console, "Stashed jailbreakd port!\n");
-            } else {
-                dprintf(fd_console, "No task_set_bootstrap_port for you...\n");
-            }
-        } else {
-            dprintf(fd_console, "No bootstrap port - let's hope it's set it already...\n");
-        }
+        
+        // Clear bootstrap port (stashd will set it again)
+        task_set_bootstrap_port(mach_task_self_, MACH_PORT_NULL);
+        
+        // Call swift hook
+        swift_reboot_hook(fd_console);
         
         setenv("XPC_USERSPACE_REBOOTED", "1", 1);
         setenv("DYLD_INSERT_LIBRARIES", "/usr/lib/libFuFuGuGu.dylib", 1);
@@ -195,15 +206,227 @@ void injectDylibToEnvVars(char *const envp[], char ***outEnvp, char **freeme) {
     *outEnvp = newEnvp;
 }
 
+#pragma mark codehashes
+
+/*
+ * Magic numbers used by Code Signing
+ */
+enum {
+    CSMAGIC_REQUIREMENT    = 0xfade0c00,        /* single Requirement blob */
+    CSMAGIC_REQUIREMENTS = 0xfade0c01,        /* Requirements vector (internal requirements) */
+    CSMAGIC_CODEDIRECTORY = 0xfade0c02,        /* CodeDirectory blob */
+    CSMAGIC_EMBEDDED_SIGNATURE = 0xfade0cc0, /* embedded form of signature data */
+    CSMAGIC_DETACHED_SIGNATURE = 0xfade0cc1, /* multi-arch collection of embedded signatures */
+};
+
+enum {
+    CS_PAGE_SIZE_4K                = 4096,
+    CS_PAGE_SIZE_16K               = 16384,
+
+    CS_HASHTYPE_SHA1              = 1,
+    CS_HASHTYPE_SHA256            = 2,
+    CS_HASHTYPE_SHA256_TRUNCATED  = 3,
+    CS_HASHTYPE_SHA384 = 4,
+
+    CS_HASH_SIZE_SHA1             = 20,
+    CS_HASH_SIZE_SHA256           = 32,
+    CS_HASH_SIZE_SHA256_TRUNCATED = 20,
+
+    CSSLOT_CODEDIRECTORY                 = 0,
+    CSSLOT_INFOSLOT                      = 1,
+    CSSLOT_REQUIREMENTS                  = 2,
+    CSSLOT_RESOURCEDIR                   = 3,
+    CSSLOT_APPLICATION                   = 4,
+    CSSLOT_ENTITLEMENTS                  = 5,
+    CSSLOT_ALTERNATE_CODEDIRECTORIES     = 0x1000,
+    CSSLOT_ALTERNATE_CODEDIRECTORY_MAX   = 5,
+    CSSLOT_ALTERNATE_CODEDIRECTORY_LIMIT =
+    CSSLOT_ALTERNATE_CODEDIRECTORIES + CSSLOT_ALTERNATE_CODEDIRECTORY_MAX,
+    CSSLOT_CMS_SIGNATURE                 = 0x10000,
+//    kSecCodeSignatureAdhoc      = 2
+};
+
+
+/*
+ * Structure of an embedded-signature SuperBlob
+ */
+typedef struct __BlobIndex {
+    uint32_t type;                    /* type of entry */
+    uint32_t offset;                /* offset of entry */
+} CS_BlobIndex;
+
+typedef struct __SuperBlob {
+    uint32_t magic;                    /* magic number */
+    uint32_t length;                /* total length of SuperBlob */
+    uint32_t count;                    /* number of index entries following */
+    CS_BlobIndex index[];            /* (count) entries */
+    /* followed by Blobs in no particular order as indicated by offsets in index */
+} CS_SuperBlob;
+
+
+/*
+ * C form of a CodeDirectory.
+ */
+typedef struct __CodeDirectory {
+    uint32_t magic;                    /* magic number (CSMAGIC_CODEDIRECTORY) */
+    uint32_t length;                /* total length of CodeDirectory blob */
+    uint32_t version;                /* compatibility version */
+    uint32_t flags;                    /* setup and mode flags */
+    uint32_t hashOffset;            /* offset of hash slot element at index zero */
+    uint32_t identOffset;            /* offset of identifier string */
+    uint32_t nSpecialSlots;            /* number of special hash slots */
+    uint32_t nCodeSlots;            /* number of ordinary (code) hash slots */
+    uint32_t codeLimit;                /* limit to main image signature range */
+    uint8_t hashSize;                /* size of each hash in bytes */
+    uint8_t hashType;                /* type of hash (cdHashType* constants) */
+    uint8_t spare1;                    /* unused (must be zero) */
+    uint8_t    pageSize;                /* log2(page size in bytes); 0 => infinite */
+    uint32_t spare2;                /* unused (must be zero) */
+    /* followed by dynamic content as located by offset fields above */
+} CS_CodeDirectory;
+
+
+/*
+ * Sample code to locate the CodeDirectory from an embedded signature blob
+ */
+static inline const CS_CodeDirectory *findCodeDirectory(const CS_SuperBlob *embedded)
+{
+    if (embedded && ntohl(embedded->magic) == CSMAGIC_EMBEDDED_SIGNATURE) {
+        const CS_BlobIndex *limit = &embedded->index[ntohl(embedded->count)];
+        const CS_BlobIndex *p;
+        for (p = embedded->index; p < limit; ++p)
+            if (ntohl(p->type) == CSSLOT_CODEDIRECTORY) {
+                const unsigned char *base = (const unsigned char *)embedded;
+                const CS_CodeDirectory *cd = (const CS_CodeDirectory *)(base + ntohl(p->offset));
+                if (ntohl(cd->magic) == CSMAGIC_CODEDIRECTORY)
+                    return cd;
+            }
+    }
+    // not found
+    return NULL;
+}
+
+#pragma mark lib
+
+int trustCDHash(const uint8_t *hash, size_t hashSize, uint8_t hashType){
+    int err = 0;
+    if (true){
+        xpc_object_t req = NULL;
+        xpc_object_t rsp = NULL;
+        //
+        assure(req = xpc_dictionary_create(NULL, NULL, 0));
+        xpc_dictionary_set_string(req, "action", "trustcdhash");
+        xpc_dictionary_set_data(req, "hashdata", hash, hashSize);
+        xpc_dictionary_set_uint64(req, "hashtype", hashType);
+        assure(!xpc_pipe_routine(gJBDPipe, req, &rsp));
+        err = (int)xpc_dictionary_get_uint64(rsp, "status");
+    error:
+        if (req){
+            xpc_release(req); req = NULL;
+        }
+        if (rsp){
+            xpc_release(rsp); rsp = NULL;
+        }
+    }
+    return err;
+}
+
+#pragma mark parsing
+int trustCDHashForCSSuperBlob(const CS_CodeDirectory *csdir){
+    int err = 0;
+    uint8_t hash[CC_SHA384_DIGEST_LENGTH] = {};
+    size_t hashSize = sizeof(hash);
+    switch (csdir->hashType) {
+        case CS_HASHTYPE_SHA1:
+            CC_SHA1(csdir, ntohl(csdir->length), hash);
+            hashSize = 20;
+            break;
+        case CS_HASHTYPE_SHA256:
+            CC_SHA256(csdir, ntohl(csdir->length), hash);
+            hashSize = 20;
+            break;
+        case CS_HASHTYPE_SHA256_TRUNCATED:
+            CC_SHA256(csdir, ntohl(csdir->length), hash);
+            hashSize = 20;
+            break;
+        case CS_HASHTYPE_SHA384:
+            CC_SHA384(csdir, ntohl(csdir->length), hash);
+            hashSize = 20;
+            break;
+        default:
+            assure(0);
+    }
+    err = trustCDHash(hash,hashSize,csdir->hashType);
+error:
+    return err;
+}
+
+int trustCDHashesForMachHeader(struct mach_header_64 *mh){
+    struct load_command *lcmd = (struct load_command *)(mh + 1);
+    int err = 0;
+    uint8_t *codesig = NULL;
+    size_t codesigSize = 0;
+    for (uint32_t i=0; i<mh->ncmds; i++, lcmd = (struct load_command *)((uint8_t *)lcmd + lcmd->cmdsize)) {
+        if (lcmd->cmd == LC_CODE_SIGNATURE){
+            struct linkedit_data_command* cs = (struct linkedit_data_command*)lcmd;
+            codesig += (uint64_t)mh + cs->dataoff;
+            codesigSize = cs->datasize;
+        }
+    }
+    assure(codesig && codesigSize);
+    err = trustCDHashForCSSuperBlob(findCodeDirectory((const CS_SuperBlob*)codesig));
+error:
+    return err;
+}
+
+int trustCDHashesForBinary(const char *path){
+    int fd = -1;
+    uint8_t *buf = NULL;
+    //
+    int err = 0;
+    size_t bufSize = 0;
+    struct stat st = {};
+    assure((fd = open(path, O_RDONLY)) != -1);
+    assure(!fstat(fd, &st));
+    assure(buf = malloc(bufSize = st.st_size));
+    assure(read(fd, buf, bufSize) == bufSize);
+    
+    {
+        struct fat_header *ft = (struct fat_header*)buf;
+        if (ft->magic != ntohl(FAT_MAGIC)){
+            err = trustCDHashesForMachHeader((struct mach_header_64*)buf);
+        }else{
+            uint32_t narch = ntohl(ft->nfat_arch);
+            struct fat_arch *gfa = (struct fat_arch *)(ft+1);
+            for (int i=0; i<narch; i++) {
+                struct fat_arch *fa = &gfa[i];
+                struct mach_header_64 *mh = (struct mach_header_64 *)(buf+ntohl(fa->offset));
+                if (ntohl(fa->cputype) == CPU_TYPE_ARM64) {
+                    if ((err = trustCDHashesForMachHeader(mh))) goto error;
+                }
+            }
+        }
+    }
+    
+error:
+    safeFree(buf);
+    safeClose(fd);
+    return err;
+}
+
 int my_posix_spawn(pid_t *pid, const char *path, const posix_spawn_file_actions_t *file_actions, const posix_spawnattr_t *attrp, char *const argv[], char *const envp[]){
     int fd_console = open("/dev/console",O_RDWR,0);
-    dprintf(fd_console, "spawning %s\n", path);
+    dprintf(fd_console, "spawning %s", path);
+    for (size_t i = 0; argv[i]; i++) {
+        dprintf(fd_console, " %s", argv[i]);
+    }
+    dprintf(fd_console, "\n");
     close(fd_console);
     
     int ret = 0;
     char **out = NULL;
     char *freeme[2] = { NULL, NULL };
-    //trustCDHashesForBinary(path);
+    trustCDHashesForBinary(path);
     injectDylibToEnvVars(envp, &out, freeme);
     if (out)
         envp = out;
@@ -218,13 +441,17 @@ DYLD_INTERPOSE(my_posix_spawn, posix_spawn);
 
 int my_posix_spawnp(pid_t *pid, const char *path, const posix_spawn_file_actions_t *file_actions, const posix_spawnattr_t *attrp, char *const argv[], char *const envp[]){
     int fd_console = open("/dev/console",O_RDWR,0);
-    dprintf(fd_console, "spawning %s\n", path);
+    dprintf(fd_console, "spawning %s", path);
+    for (size_t i = 0; argv[i]; i++) {
+        dprintf(fd_console, " %s", argv[i]);
+    }
+    dprintf(fd_console, "\n");
     close(fd_console);
     
     int ret = 0;
     char **out = NULL;
     char *freeme[2] = { NULL, NULL };
-    //trustCDHashesForBinary(path);
+    trustCDHashesForBinary(path);
     injectDylibToEnvVars(envp, &out, freeme);
     if (out)
         envp = out;
@@ -316,12 +543,6 @@ int my_xpc_receive_mach_msg(void *a1, void *a2, void *a3, void *a4, xpc_object_t
                 }
             }
         }
-        
-        char *desc = xpc_copy_description(*object_out);
-        int fd_console = open("/dev/console", O_RDWR, 0);
-        dprintf(fd_console, "XPC Request: %s\n", desc);
-        close(fd_console);
-        free(desc);
     }
     
     return err;
@@ -338,8 +559,7 @@ static void customConstructor(int argc, const char **argv){
     if (kr == KERN_SUCCESS) {
         if (!MACH_PORT_VALID(bp)) {
             dprintf(fd_console,"No bootstrap port, no KRW, nothing I can do, goodbye!\n");
-            //return;
-            bp = 0;
+            return;
         } else {
             dprintf(fd_console,"Got bootstrap port!\n");
         }
@@ -350,7 +570,9 @@ static void customConstructor(int argc, const char **argv){
     }
     
     swift_init(fd_console, bp, &servicePort);
-
+    
+    gJBDPipe = xpc_pipe_create_from_port(servicePort, 0);
+    
     dprintf(fd_console,"========= Goodbye from Stage 2 dylib constructor ========= \n");
     close(fd_console);
 }

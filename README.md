@@ -19,23 +19,23 @@ Current Fugu15 progress.
 Library injected into launchd and xpcproxy
 - [x] Successfully inject into launchd
 - [x] Hook required methods
+- [ ] Launch stashd before userspace reboots
 - [x] Survive userspace reboots
-- [ ] Tell jailbreakd new bootstrap port
-- [ ] Inject into xpcproxy
-- [ ] Give processes access to certain sandboxed directories
-- [ ] Load tweak injection library
-- [ ] ???
-
-## jailbreakd
-Helper service
-- [x] Transfer PPL bypass to jailbreakd
-- [ ] Transfer PAC bypass to jailbreakd
-- [x] Survive userspace reboot
-- [ ] Re-Check in after userspace reboot
+- [x] Implement service that can be looked up by applications
+- [ ] Provide service to add CSDebugged to applications
 - [ ] Provide service to add CDHash to TrustCache
 - [ ] Provide service to allow applications to access sandboxed files/folders
 - [ ] Provide service to allow applications to execute unsigned code
 - [ ] Implement libkrw/libkernrw/libwhateverrw support
+- [ ] Load tweak injection library
+- [ ] ???
+
+## stashd
+Helper service
+- [x] Transfer PPL bypass to stashd
+- [x] Transfer PAC bypass to stashd
+- [x] Survive userspace reboot
+- [x] Transfer primitives to launchd
 - [ ] ???
 
 ## dyld

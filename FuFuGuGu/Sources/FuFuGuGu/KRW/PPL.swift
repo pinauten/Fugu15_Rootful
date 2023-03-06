@@ -38,19 +38,19 @@ public extension KRW {
     
     static func initPPLBypass(inProcess pid: pid_t) throws -> Bool {
         guard let pmap = try Proc(pid: pid)?.task?.vmMap?.pmap else {
-            print("Failed to get other process pmap!")
+            log("Failed to get other process pmap!")
             return false
         }
         
         let kr = pmap_enter_options_addr(pmap.address, FAKE_PHYSPAGE_TO_MAP, PPL_MAP_ADDR)
         guard kr == KERN_SUCCESS else {
-            print("pmap_enter_options_addr failed!")
+            log("pmap_enter_options_addr failed!")
             return false
         }
         
         guard let origType = pmap.type else {
             pmap_remove(pmap.address, PPL_MAP_ADDR, PPL_MAP_ADDR + 0x4000)
-            print("pmap_enter_options_addr failed!")
+            log("pmap_enter_options_addr failed!")
             return false
         }
         
@@ -66,7 +66,7 @@ public extension KRW {
         // Change the mapping to map the underlying page table
         let table2Entry = try pmap_lv2(pmap.address, PPL_MAP_ADDR)
         guard (table2Entry & 0x3) == 0x3 else {
-            print("table2Entry has wrong type!")
+            log("table2Entry has wrong type!")
             return false
         }
         

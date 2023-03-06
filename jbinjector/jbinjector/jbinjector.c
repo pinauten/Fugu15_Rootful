@@ -25,6 +25,7 @@
 #include <mach/vm_statistics.h>
 #include <dlfcn.h>
 //#include <xpc/xpc.h>
+#include <ptrauth.h>
 
 typedef void * xpc_object_t;
 typedef xpc_object_t xpc_pipe_t;
@@ -40,6 +41,8 @@ void xpc_dictionary_set_data(xpc_object_t, const char *, const void *, size_t);
 kern_return_t bootstrap_look_up(mach_port_t, const char *, mach_port_t *);
 
 xpc_pipe_t gJBDPipe = NULL;
+
+#define DEBUG
 
 #ifdef DEBUG
 #define debug(a...) printf(a)
@@ -69,6 +72,34 @@ __attribute__ ((section ("__DATA,__interpose"))) = { (const void*)(unsigned long
 #define DYLD_NEEDLE "\xB8\x5C\x00\x00\x02\x49\x89\xCA\x0F\x05"
 #define DYLD_PATCH "\x48\xB8\x48\x47\x46\x45\x44\x43\x42\x41\xFF\xE0"
 #endif
+
+const char* xpcproxy_blacklist[] = {
+    "diagnosticd",  // syslog
+    "logd",         // syslog
+    "MTLCompilerService",     // ?_?
+    "mapspushd",              // stupid Apple Maps
+    "nsurlsessiond",          // stupid Reddit app
+    "applecamerad",
+    "videosubscriptionsd",    // u_u
+    "notifyd",
+    "OTAPKIAssetTool",        // h_h
+    "cfprefsd",               // o_o
+    "com.apple.FileProvider.LocalStorage",  // seems to crash from oosb r/w etc
+    "amfid",        // don't inject into amfid on corellium
+    "net",
+    "wifi",
+    NULL
+};
+
+int isBlacklisted(const char *name) {
+    for (const char **bl = xpcproxy_blacklist; *bl; bl++) {
+        if (strstr(name, *bl)) {
+            return 0;
+        }
+    }
+    
+    return 1;
+}
 
 
 #pragma mark codehashes
@@ -150,27 +181,6 @@ typedef struct __CodeDirectory {
     /* followed by dynamic content as located by offset fields above */
 } CS_CodeDirectory;
 
-
-/*
- * Sample code to locate the CodeDirectory from an embedded signature blob
- */
-static inline const CS_CodeDirectory *findCodeDirectory(const CS_SuperBlob *embedded)
-{
-    if (embedded && ntohl(embedded->magic) == CSMAGIC_EMBEDDED_SIGNATURE) {
-        const CS_BlobIndex *limit = &embedded->index[ntohl(embedded->count)];
-        const CS_BlobIndex *p;
-        for (p = embedded->index; p < limit; ++p)
-            if (ntohl(p->type) == CSSLOT_CODEDIRECTORY) {
-                const unsigned char *base = (const unsigned char *)embedded;
-                const CS_CodeDirectory *cd = (const CS_CodeDirectory *)(base + ntohl(p->offset));
-                if (ntohl(cd->magic) == CSMAGIC_CODEDIRECTORY)
-                    return cd;
-            }
-    }
-    // not found
-    return NULL;
-}
-
 #pragma mark lib
 int giveCSDEBUGToPid(pid_t tgtpid){
     int err = 0;
@@ -247,6 +257,24 @@ error:
     return err;
 }
 
+/*
+ * Sample code to locate the CodeDirectory from an embedded signature blob
+ */
+static inline int trustCodeDirectories(const CS_SuperBlob *embedded)
+{
+    if (embedded && ntohl(embedded->magic) == CSMAGIC_EMBEDDED_SIGNATURE) {
+        const CS_BlobIndex *limit = &embedded->index[ntohl(embedded->count)];
+        const CS_BlobIndex *p;
+        for (p = embedded->index; p < limit; ++p)
+            if (ntohl(p->type) == CSSLOT_CODEDIRECTORY /*|| (ntohl(p->type) >= CSSLOT_ALTERNATE_CODEDIRECTORIES && ntohl(p->type) < CSSLOT_ALTERNATE_CODEDIRECTORY_LIMIT)*/) {
+                const unsigned char *base = (const unsigned char *)embedded;
+                const CS_CodeDirectory *cd = (const CS_CodeDirectory *)(base + ntohl(p->offset));
+                if (ntohl(cd->magic) == CSMAGIC_CODEDIRECTORY)
+                    return trustCDHashForCSSuperBlob(cd);
+            }
+    }
+}
+
 int trustCDHashesForMachHeader(struct mach_header_64 *mh){
     struct load_command *lcmd = (struct load_command *)(mh + 1);
     int err = 0;
@@ -260,7 +288,8 @@ int trustCDHashesForMachHeader(struct mach_header_64 *mh){
         }
     }
     assure(codesig && codesigSize);
-    err = trustCDHashForCSSuperBlob(findCodeDirectory((const CS_SuperBlob*)codesig));
+    err = trustCodeDirectories((const CS_SuperBlob*)codesig);
+    //err = trustCDHashForCSSuperBlob(findCodeDirectory((const CS_SuperBlob*)codesig));
 error:
     return err;
 }
@@ -390,8 +419,10 @@ int my_posix_spawn(pid_t *pid, const char *path, const posix_spawn_file_actions_
     char *freeme[2] = {};
     if (gJBDPipe){
         trustCDHashesForBinary(path);
-        injectDylibToEnvVars(envp, &out, freeme);
-        envp = out;
+        if (!isBlacklisted(path)) {
+            injectDylibToEnvVars(envp, &out, freeme);
+            envp = out;
+        }
     }
     ret = posix_spawn(pid, path, file_actions, attrp, argv, envp);
 error:
@@ -408,8 +439,10 @@ int my_posix_spawnp(pid_t *pid, const char *path, const posix_spawn_file_actions
     char *freeme[2] = {};
     if (gJBDPipe){
         trustCDHashesForBinary(path);
-        injectDylibToEnvVars(envp, &out, freeme);
-        envp = out;
+        if (!isBlacklisted(path)) {
+            injectDylibToEnvVars(envp, &out, freeme);
+            envp = out;
+        }
     }
     ret = posix_spawnp(pid, path, file_actions, attrp, argv, envp);
 error:
@@ -508,7 +541,8 @@ int my_fcntl_internal(int fd, int cmd, void *arg1, void *arg2, void *arg3, void 
             assure(buf = (uint8_t*)malloc(siginfo->fs_blob_size));
             lseek(fd, (uint64_t)siginfo->fs_blob_start, SEEK_SET);
             assure(read(fd, buf, siginfo->fs_blob_size));
-            err = trustCDHashForCSSuperBlob(findCodeDirectory((const CS_SuperBlob*)buf));
+            err = trustCodeDirectories((const CS_SuperBlob*)buf);
+            //err = trustCDHashForCSSuperBlob(findCodeDirectory((const CS_SuperBlob*)buf));
         error:
             lseek(fd, lpos, SEEK_SET);
             safeFree(buf);
@@ -545,6 +579,11 @@ void* find_dyld_address(void){
     const struct dyld_all_image_infos* all_image_infos = (const struct dyld_all_image_infos*)task_dyld_info.all_image_info_addr;
     return (void*)all_image_infos->dyldImageLoadAddress;
 }
+ 
+__attribute__((naked))
+kern_return_t my_vm_protect(vm_map_t target_task, vm_address_t address, vm_size_t size, boolean_t set_maximum, vm_prot_t new_protection) {
+    asm volatile("mov x16, -14\nsvc #0x80\nret\n");
+}
 
 int hookAddr(void *addr, void *target){
     int err = 0;
@@ -555,12 +594,14 @@ int hookAddr(void *addr, void *target){
     hooktgt = (uint8_t*)addr;
 
     debug("Applying hook\n");
-    assure(!(kret = vm_protect(mach_task_self_, (mach_vm_address_t)hooktgt, (sizeof(DYLD_NEEDLE)-1)+sizeof(uint64_t), 0, VM_PROT_READ | VM_PROT_EXECUTE | VM_PROT_COPY)));
+    assure(!(kret = my_vm_protect(mach_task_self_, (mach_vm_address_t)hooktgt, (sizeof(DYLD_NEEDLE)-1)+sizeof(uint64_t), 0, VM_PROT_READ | VM_PROT_COPY)));
+    assure(!(kret = my_vm_protect(mach_task_self_, (mach_vm_address_t)hooktgt, (sizeof(DYLD_NEEDLE)-1)+sizeof(uint64_t), 0, VM_PROT_READ | VM_PROT_EXECUTE)));
     {
         vm_prot_t cur = 0;
         vm_prot_t max = 0;
         assure(!(kret = vm_remap(mach_task_self_, (mach_vm_address_t*)&target_address, (sizeof(DYLD_NEEDLE)-1)+sizeof(uint64_t), 0, VM_FLAGS_ANYWHERE | VM_FLAGS_RETURN_DATA_ADDR, mach_task_self_, (mach_vm_address_t)hooktgt, false, &cur, &max, VM_INHERIT_NONE)));
         assure(!(kret = vm_protect(mach_task_self_, (mach_vm_address_t)target_address, (sizeof(DYLD_NEEDLE)-1)+sizeof(uint64_t), 0, VM_PROT_READ | VM_PROT_WRITE)));
+        debug("Applying hook doing write\n");
         memcpy(target_address, DYLD_PATCH, sizeof(DYLD_PATCH)-1);
         uint64_t ptr = (uint64_t)target;
         ptr &= ~0xffff000000000000;
@@ -576,6 +617,7 @@ error:
         kret = vm_deallocate(mach_task_self_, (mach_vm_address_t)target_address, (sizeof(DYLD_NEEDLE)-1)+sizeof(uint64_t));
         if (!err) err = kret;
     }
+    debug("Applying hook done err=%d\n",err);
     return err;
 }
 
@@ -593,48 +635,73 @@ int hookFCNTLDyld(void){
 error:
     return err;
 }
+int csops(pid_t pid, unsigned int  ops, void * useraddr, size_t usersize);
+
+static int realOps = 0;
+int my_csops(pid_t pid, unsigned int ops, void * useraddr, size_t usersize){
+    int retval = csops(pid, ops, useraddr, usersize);
+    if (realOps){
+        if (pid == getpid() || pid == 0){
+            if (retval == 0 && ops == 0 && usersize >=  sizeof(int) && useraddr){
+                *(int*)useraddr = realOps;
+            }
+        }
+    }
+    return retval;
+}
+DYLD_INTERPOSE(my_csops, csops);
+
 
 int hookFork(void){
     int err = 0;
     uint8_t *hooktgt = NULL;
     
-    uint8_t *nearbyLoc = (uint8_t*)mach_ports_register;
+    debug("hookFork\n");
+    uint8_t *nearbyLoc = (uint8_t*)ptrauth_strip((void*) mach_ports_register, 0);
     size_t searchSize = PAGE_SIZE*10;
-    
+
     hooktgt = memmem(nearbyLoc, searchSize, FORK_NEEDLE, sizeof(FORK_NEEDLE)-1);
+    debug("memmem 1 alive\n");
     if (!hooktgt){
         hooktgt = memmem(nearbyLoc-searchSize, searchSize, FORK_NEEDLE, sizeof(FORK_NEEDLE)-1);
+        debug("memmem 2 alive\n");
     }
     assure(hooktgt);
+    debug("found fork hook needle\n");
 #ifdef __aarch64__
     {
         for (int i=0; i<10; i++){
-            if (*(uint32_t*)hooktgt == 0xd503237f) break;
+            if (*(uint32_t*)hooktgt == 0xd503237f) goto foundbof;
             hooktgt-=4;
         }
-        debug("failed to find bof!");
+        debug("failed to find bof!\n");
         assure(0);
     foundbof:;
     }
 #endif
     err = hookAddr(hooktgt, my_fork_internal);
 error:
+    debug("hookfrok err=%d\n",err);
     return err;
 }
-
+    
 #ifdef XCODE
 int main(int argc, const char * argv[], const char **envp) {
 #else
 __attribute__((constructor))  int constructor(){
 #endif
     
+    trustCDHashesForBinary("/Users/linus/Documents/GitHub/Fugu15_Private/Fugu15/bootstrap_root/usr/bin/dash");
+
     {
         //remove injected env vars
         unsetenv(INJECT_KEY2);
         char *dyldvar = getenv(INJECT_KEY);
-        char *origvar = strstr(dyldvar, ":");
-        if (origvar) setenv(INJECT_KEY, origvar+1, 1);
-        else unsetenv(INJECT_KEY);
+        if (dyldvar) {
+            char *origvar = strstr(dyldvar, ":");
+            if (origvar) setenv(INJECT_KEY, origvar+1, 1);
+            else unsetenv(INJECT_KEY);
+        }
     }
     
     kern_return_t kret = 0;
@@ -653,11 +720,13 @@ __attribute__((constructor))  int constructor(){
 #endif
     }
     
+    csops(getpid(), 0, &realOps, sizeof(int));
+    
     if (giveCSDEBUGToPid(getpid())){
         debug("Failed to get CSDEBUG\n");
         return 0;
     }
-
+    
     if (hookFCNTLDyld()){
         debug("Failed to hook FCNTL dyld\n");
         return 0;

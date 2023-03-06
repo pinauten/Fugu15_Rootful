@@ -32,4 +32,8 @@ static inline void set_thread_state_to_pac_loop(arm_thread_state64_t * _Nonnull 
     arm_thread_state64_set_pc_fptr(*state, (void*) pac_loop);
 }
 
+static inline void dmb_sy() {
+    asm volatile("dmb sy");
+}
+
 #endif /* KRWC_h */

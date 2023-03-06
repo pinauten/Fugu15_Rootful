@@ -11,7 +11,9 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <mach/mach.h>
+#include <mach/message.h>
 #include <ptrauth.h>
+#include <xpc/xpc.h>
 
 // PAC
 uint64_t signPtrUnauthenticated(uint64_t ptr, void *storage, uint16_t context, bool bound, uint8_t key);
@@ -41,5 +43,11 @@ extern uint64_t gUserReturnDidHappen;
 static inline void set_thread_state_to_pac_loop(arm_thread_state64_t *state) {
     arm_thread_state64_set_pc_fptr(*state, (void*) pac_loop);
 }
+
+void xpc_dictionary_get_audit_token(xpc_object_t, audit_token_t *);
+
+#pragma clang diagnostic ignored "-Wavailability"
+pid_t audit_token_to_pid(audit_token_t atoken) API_AVAILABLE(ios(10));
+int audit_token_to_pidversion(audit_token_t atoken) API_AVAILABLE(ios(10));
 
 #endif /* CBridge_h */
