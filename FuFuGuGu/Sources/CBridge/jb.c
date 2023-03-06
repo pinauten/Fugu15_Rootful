@@ -414,53 +414,50 @@ error:
     return err;
 }
 
-int my_posix_spawn(pid_t *pid, const char *path, const posix_spawn_file_actions_t *file_actions, const posix_spawnattr_t *attrp, char *const argv[], char *const envp[]){
+int my_posix_spawn_common(pid_t *pid, const char *path, const posix_spawn_file_actions_t *file_actions, const posix_spawnattr_t *attrp, char *const argv[], char *const envp[], int is_spawnp){
     int fd_console = open("/dev/console",O_RDWR,0);
     dprintf(fd_console, "spawning %s", path);
     for (size_t i = 0; argv[i]; i++) {
         dprintf(fd_console, " %s", argv[i]);
     }
-    dprintf(fd_console, "\n");
-    close(fd_console);
+    
     
     int ret = 0;
     char **out = NULL;
     char *freeme[2] = { NULL, NULL };
     trustCDHashesForBinary(path);
+    /*if (strcmp(path, "/usr/libexec/xpcproxy") != 0) {
+        dprintf(fd_console, "Doing injection!\n");
+        injectDylibToEnvVars(envp, &out, freeme);
+    } else {
+        dprintf(fd_console, "xpcproxy - Not injecting\n");
+    }*/
     injectDylibToEnvVars(envp, &out, freeme);
+    dprintf(fd_console, "\n");
+    close(fd_console);
     if (out)
         envp = out;
-    ret = posix_spawn(pid, path, file_actions, attrp, argv, envp);
+    if (strcmp(path, "/usr/libexec/xpcproxy") == 0)
+        task_set_bootstrap_port(mach_task_self_, servicePort);
+    if (is_spawnp)
+        ret = posix_spawnp(pid, path, file_actions, attrp, argv, envp);
+    else
+        ret = posix_spawn(pid, path, file_actions, attrp, argv, envp);
+    task_set_bootstrap_port(mach_task_self_, MACH_PORT_NULL);
 error:
     safeFree(out);
     safeFree(freeme[0]);
     safeFree(freeme[1]);
     return ret;
 }
+
+int my_posix_spawn(pid_t *pid, const char *path, const posix_spawn_file_actions_t *file_actions, const posix_spawnattr_t *attrp, char *const argv[], char *const envp[]){
+    return my_posix_spawn_common(pid, path, file_actions, attrp, argv, envp, 0);
+}
 DYLD_INTERPOSE(my_posix_spawn, posix_spawn);
 
 int my_posix_spawnp(pid_t *pid, const char *path, const posix_spawn_file_actions_t *file_actions, const posix_spawnattr_t *attrp, char *const argv[], char *const envp[]){
-    int fd_console = open("/dev/console",O_RDWR,0);
-    dprintf(fd_console, "spawning %s", path);
-    for (size_t i = 0; argv[i]; i++) {
-        dprintf(fd_console, " %s", argv[i]);
-    }
-    dprintf(fd_console, "\n");
-    close(fd_console);
-    
-    int ret = 0;
-    char **out = NULL;
-    char *freeme[2] = { NULL, NULL };
-    trustCDHashesForBinary(path);
-    injectDylibToEnvVars(envp, &out, freeme);
-    if (out)
-        envp = out;
-    ret = posix_spawnp(pid, path, file_actions, attrp, argv, envp);
-error:
-    safeFree(out);
-    safeFree(freeme[0]);
-    safeFree(freeme[1]);
-    return ret;
+    return my_posix_spawn_common(pid, path, file_actions, attrp, argv, envp, 1);
 }
 DYLD_INTERPOSE(my_posix_spawnp, posix_spawnp);
 

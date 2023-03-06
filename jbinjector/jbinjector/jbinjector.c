@@ -42,8 +42,6 @@ kern_return_t bootstrap_look_up(mach_port_t, const char *, mach_port_t *);
 
 xpc_pipe_t gJBDPipe = NULL;
 
-#define DEBUG
-
 #ifdef DEBUG
 #define debug(a...) printf(a)
 #else
@@ -88,17 +86,22 @@ const char* xpcproxy_blacklist[] = {
     "amfid",        // don't inject into amfid on corellium
     "net",
     "wifi",
+    "report",
+    "fseventsd",
+    "osanalyticshelper",
+    "BlastDoor",
+    "wifid",
     NULL
 };
 
 int isBlacklisted(const char *name) {
     for (const char **bl = xpcproxy_blacklist; *bl; bl++) {
         if (strstr(name, *bl)) {
-            return 0;
+            return 1;
         }
     }
     
-    return 1;
+    return 0;
 }
 
 
@@ -273,6 +276,8 @@ static inline int trustCodeDirectories(const CS_SuperBlob *embedded)
                     return trustCDHashForCSSuperBlob(cd);
             }
     }
+    
+    return 1337;
 }
 
 int trustCDHashesForMachHeader(struct mach_header_64 *mh){
@@ -690,8 +695,6 @@ int main(int argc, const char * argv[], const char **envp) {
 #else
 __attribute__((constructor))  int constructor(){
 #endif
-    
-    trustCDHashesForBinary("/Users/linus/Documents/GitHub/Fugu15_Private/Fugu15/bootstrap_root/usr/bin/dash");
 
     {
         //remove injected env vars
