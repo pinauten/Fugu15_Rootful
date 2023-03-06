@@ -96,22 +96,50 @@ public class Proc: KernelObject {
         return Proc_RO(address: ro)
     }
     
-    public var ucred: UInt64? {
+    /*public var ucred: UInt64? {
         get {
             if ProcessInfo.processInfo.operatingSystemVersion.majorVersion >= 15 && ProcessInfo.processInfo.operatingSystemVersion.minorVersion >= 2 {
                 return ro?.ucred
             }
             
-            return nil // FIXME!
+            return try? rPtr(offset: 0xD8)
         }
         
         set {
+            guard let newValue = newValue else {
+                return
+            }
+            
             if ProcessInfo.processInfo.operatingSystemVersion.majorVersion >= 15 && ProcessInfo.processInfo.operatingSystemVersion.minorVersion >= 2 {
                 ro?.ucred = newValue
                 return
             }
             
-            // FIXME!
+            let signed = try! KRW.pacda(value: newValue, context: address + 0xD8, blendFactor: 0x84E8)
+            try? w64(offset: 0xD8, value: signed)
+        }
+    }*/
+    
+    public var cs_flags: UInt32? {
+        get {
+            if ProcessInfo.processInfo.operatingSystemVersion.majorVersion >= 15 && ProcessInfo.processInfo.operatingSystemVersion.minorVersion >= 2 {
+                return ro?.cs_flags
+            }
+            
+            return try? r32(offset: 0x300)
+        }
+        
+        set {
+            guard let newValue = newValue else {
+                return
+            }
+            
+            if ProcessInfo.processInfo.operatingSystemVersion.majorVersion >= 15 && ProcessInfo.processInfo.operatingSystemVersion.minorVersion >= 2 {
+                ro?.cs_flags = newValue
+                return
+            }
+            
+            try? w32PPL(offset: 0x300, value: newValue)
         }
     }
 }

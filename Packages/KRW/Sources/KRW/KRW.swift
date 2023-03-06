@@ -28,10 +28,11 @@ fileprivate func get_offset(_ name: UnsafePointer<CChar>) -> UInt {
 }
 
 public class KRW {
-    private  static var didInit     = false
-    internal static var didInitPAC  = false
-    internal static var didInitPPL  = false
-    public   static let patchfinder = KernelPatchfinder.running!
+    private  static var didInit      = false
+    internal static var didInitPAC   = false
+    internal static var didInitPPL   = false
+    internal static var didInitPPLRW = false
+    public   static let patchfinder  = KernelPatchfinder.running!
     
     internal static var phystokvTable: [phystokvEntry] = []
     public internal(set) static var physBase: UInt64 = 0
@@ -78,6 +79,10 @@ public class KRW {
     }
     
     public static func kread(virt: UInt64, size: Int) throws -> Data {
+        if didInitPPLRW {
+            return try PPLRW.read(virt: virt, count: size)
+        }
+        
         try doInit()
         
         var data = Data(repeating: 0, count: size)
@@ -122,6 +127,11 @@ public class KRW {
     }
     
     public static func kwrite(virt: UInt64, data: Data) throws {
+        if didInitPPLRW {
+            try PPLRW.write(virt: virt, data: data)
+            return
+        }
+        
         try doInit()
         
         let res = data.withUnsafeBytes { ptr in

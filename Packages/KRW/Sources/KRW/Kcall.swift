@@ -67,10 +67,23 @@ public extension KRW {
     }
     
     @discardableResult
-    static func kcall(func: UInt64, a1: UInt64, a2: UInt64, a3: UInt64, a4: UInt64, a5: UInt64, a6: UInt64, a7: UInt64, a8: UInt64) throws -> UInt64 {
+    static func kcall(func: UInt64, a1: UInt64, a2: UInt64, a3: UInt64, a4: UInt64, a5: UInt64, a6: UInt64, a7: UInt64, a8: UInt64, a_x8: UInt64 = 0, a_x9: UInt64 = 0) throws -> UInt64 {
         try doPacBypass()
         
-        return KRWC.kcall(`func`, a1, a2, a3, a4, a5, a6, a7, a8)
+        return KRWC.kcall(`func`, a1, a2, a3, a4, a5, a6, a7, a8, a_x8, a_x9)
+    }
+    
+    static func pacda(value: UInt64, context: UInt64, blendFactor: UInt16? = nil) throws -> UInt64 {
+        var ctx = context
+        if let factor = blendFactor {
+            ctx = (ctx & ~0xFFFF000000000000) | (UInt64(factor) << 48)
+        }
+        
+        let buf = try alloc(size: 0x8)
+        
+        _ = try kcall(func: try slide(virt: patchfinder.pacda_gadget!), a1: 0, a2: value, a3: 0, a4: 0, a5: 0, a6: 0, a7: 0, a8: 0, a_x8: buf, a_x9: ctx)
+        
+        return try r64(virt: buf)
     }
     
     static func initKCallInThread(thread: UInt64) throws {

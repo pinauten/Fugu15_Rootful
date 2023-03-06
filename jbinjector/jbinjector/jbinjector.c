@@ -528,11 +528,11 @@ pid_t my_fork(void){
     pid_t p = fork();
     if (p>0){
         //parent
-        giveCSDEBUGToPid(p);
         {
             int asd = 0;
             waitpid(p, &asd, WUNTRACED);
         }
+        giveCSDEBUGToPid(p);
         kill(p, SIGCONT);
     }
     return p;

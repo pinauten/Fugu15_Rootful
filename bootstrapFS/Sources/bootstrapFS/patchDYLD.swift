@@ -123,25 +123,38 @@ func patchDYLD(real: String, patched: String, trustCache: String) throws {
         throw PatchDYLDError.DYLD_AMFI_FAKE_xrefNotFound
     }
     
-    guard let cmp = AArch64Instr.Args.cmp(text.instruction(at: xref + 0x10) ?? 0) else {
-        throw PatchDYLDError.noCMP
-    }
+    var nopA: Int!
+    var nopB: Int!
     
-    guard cmp.regA == 0 && cmp.isImm && cmp.immOrRegB == 0 else {
-        throw PatchDYLDError.badCMP
+    if let cmp = AArch64Instr.Args.cmp(text.instruction(at: xref + 0x10) ?? 0) {
+        guard cmp.regA == 0 && cmp.isImm && cmp.immOrRegB == 0 else {
+            throw PatchDYLDError.badCMP
+        }
+        
+        guard AArch64Instr.Emulate.conditionalBranch(text.instruction(at: xref + 0x18) ?? 0, pc: xref + 0x18) != nil else {
+            throw PatchDYLDError.noCondBranch
+        }
+        
+        guard AArch64Instr.Emulate.compareBranch(text.instruction(at: xref + 0x20) ?? 0, pc: xref + 0x20) != nil else {
+            throw PatchDYLDError.noCmpBranch
+        }
+        
+        // Okay, simply nop-ing xref + 0x14 and xref + 0x20 should be enough
+        nopA = Int((xref + 0x14) - text.baseAddress)
+        nopB = Int((xref + 0x20) - text.baseAddress)
+    } else {
+        guard AArch64Instr.Emulate.compareBranch(text.instruction(at: xref + 0x10) ?? 0, pc: xref + 0x10) != nil else {
+            throw PatchDYLDError.noCondBranch
+        }
+        
+        guard AArch64Instr.Emulate.compareBranch(text.instruction(at: xref + 0x18) ?? 0, pc: xref + 0x18) != nil else {
+            throw PatchDYLDError.noCmpBranch
+        }
+        
+        // Okay, simply nop-ing xref + 0x10 and xref + 0x18 should be enough
+        nopA = Int((xref + 0x0C) - text.baseAddress)
+        nopB = Int((xref + 0x18) - text.baseAddress)
     }
-    
-    guard AArch64Instr.Emulate.conditionalBranch(text.instruction(at: xref + 0x18) ?? 0, pc: xref + 0x18) != nil else {
-        throw PatchDYLDError.noCondBranch
-    }
-    
-    guard AArch64Instr.Emulate.compareBranch(text.instruction(at: xref + 0x20) ?? 0, pc: xref + 0x20) != nil else {
-        throw PatchDYLDError.noCmpBranch
-    }
-    
-    // Okay, simply nop-ing xref + 0x14 and xref + 0x20 should be enough
-    let nopA = Int((xref + 0x14) - text.baseAddress)
-    let nopB = Int((xref + 0x20) - text.baseAddress)
     
     // XXX: Assuming contiguous MachO
     var data = machO.data

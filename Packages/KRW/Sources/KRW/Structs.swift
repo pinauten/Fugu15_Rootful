@@ -53,9 +53,11 @@ public class Proc: KernelObject {
         
         var curProc = try KRW.slide(virt: allproc)
         while curProc != 0 {
-            if try KRW.r32(virt: curProc + 0x68 /* PROC_PID */) == pid {
-                self.init(address: curProc)
-                return
+            if try KRW.rPtr(virt: curProc + 0x8) != 0 {
+                if try KRW.r32(virt: curProc + 0x68 /* PROC_PID */) == pid {
+                    self.init(address: curProc)
+                    return
+                }
             }
             
             curProc = try KRW.rPtr(virt: curProc)
@@ -99,16 +101,21 @@ public class Proc: KernelObject {
                 return ro?.ucred
             }
             
-            return nil // FIXME!
+            return try? rPtr(offset: 0xD8)
         }
         
         set {
+            guard let newValue = newValue else {
+                return
+            }
+            
             if ProcessInfo.processInfo.operatingSystemVersion.majorVersion >= 15 && ProcessInfo.processInfo.operatingSystemVersion.minorVersion >= 2 {
                 ro?.ucred = newValue
                 return
             }
             
-            // FIXME!
+            let signed = try! KRW.pacda(value: newValue, context: address + 0xD8, blendFactor: 0x84E8)
+            try? w64(offset: 0xD8, value: signed)
         }
     }
 }

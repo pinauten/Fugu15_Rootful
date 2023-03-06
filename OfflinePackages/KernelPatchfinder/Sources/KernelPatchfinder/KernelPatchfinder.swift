@@ -967,6 +967,14 @@ open class KernelPatchfinder {
         }
     }()
     
+    public lazy var pacda_gadget: UInt64? = {
+        if cachedResults != nil {
+            return cachedResults.unsafelyUnwrapped["pacda_gadget"]
+        }
+        
+        return textExec.addrOf([0xF100003F, 0xDAC10921, 0x9A8103E9, 0xF9000109, 0xD65F03C0])
+    }()
+    
     public func exportResults() -> Data? {
         let results_opt = [
             "baseAddress": baseAddress,
@@ -1007,7 +1015,8 @@ open class KernelPatchfinder {
             "ptov_data_table": ptov_data?.table,
             "ptov_data_physBase": ptov_data?.physBase,
             "ptov_data_virtBase": ptov_data?.virtBase,
-            "pmap_alloc_page_for_kern": pmap_alloc_page_for_kern
+            "pmap_alloc_page_for_kern": pmap_alloc_page_for_kern,
+            "pacda_gadget": pacda_gadget
         ]
         
         let results = results_opt.filter { (k, v) in

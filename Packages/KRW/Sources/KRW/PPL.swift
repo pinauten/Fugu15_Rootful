@@ -27,6 +27,14 @@ public extension KRW {
         }
         
         didInitPPL = true
+        
+        let cpu_ttep = try KRW.r64(virt: KRW.slide(virt: KRW.patchfinder.cpu_ttep!))
+        
+        _ = try KRW.initPPLBypass(inProcess: getpid())
+        
+        PPLRW.initialize(magicPage: PPL_MAP_ADDR, cpuTTEP: cpu_ttep)
+        
+        didInitPPLRW = true
     }
     
     static func pplwrite(virt: UInt64, data: Data) throws {

@@ -36,7 +36,7 @@ let iDownloadCmds = [
 ] as [String: iDownloadCmd]
 
 func iDownload_test(_ hndlr: iDownloadHandler, _ cmd: String, _ args: [String]) throws {
-    let cpu_ttep = try KRW.r64(virt: KRW.slide(virt: KRW.patchfinder.cpu_ttep!))
+    /*let cpu_ttep = try KRW.r64(virt: KRW.slide(virt: KRW.patchfinder.cpu_ttep!))
     
     try KRW.initPPLBypass(inProcess: getpid())
     
@@ -46,7 +46,7 @@ func iDownload_test(_ hndlr: iDownloadHandler, _ cmd: String, _ args: [String]) 
     
     tc?.append(hash: Data(repeating: 0x11, count: 20))
     tc?.append(hash: Data(repeating: 0x22, count: 20))
-    tc?.append(hash: Data(repeating: 0x01, count: 20))
+    tc?.append(hash: Data(repeating: 0x01, count: 20))*/
 }
 
 func iDownload_help(_ hndlr: iDownloadHandler, _ cmd: String, _ args: [String]) throws {
@@ -63,8 +63,9 @@ func pivot_root(new: String, old: String) throws -> UInt64 {
     try KRW.kwrite(virt: bufferNew, data: new.data(using: .utf8)!)
     try KRW.kwrite(virt: bufferOld, data: old.data(using: .utf8)!)
     
-    return try KRW.kcall(func: KRW.slide(virt: 0xFFFFFFF007D0D8C0), a1: bufferNew, a2: bufferOld, a3: 0, a4: 0, a5: 0, a6: 0, a7: 0, a8: 0)
+    //return try KRW.kcall(func: KRW.slide(virt: 0xFFFFFFF007D0D8C0), a1: bufferNew, a2: bufferOld, a3: 0, a4: 0, a5: 0, a6: 0, a7: 0, a8: 0)
     //return try KRW.kcall(func: KRW.slide(virt: 0xFFFFFFF007CE32C8), a1: bufferNew, a2: bufferOld, a3: 0, a4: 0, a5: 0, a6: 0, a7: 0, a8: 0)
+    return try KRW.kcall(func: KRW.slide(virt: 0xFFFFFFF007DB3C14), a1: bufferNew, a2: bufferOld, a3: 0, a4: 0, a5: 0, a6: 0, a7: 0, a8: 0)
 }
 
 func iDownload_rootfs(_ hndlr: iDownloadHandler, _ cmd: String, _ args: [String]) throws {
@@ -226,9 +227,8 @@ func iDownload_pivotRoot(_ hndlr: iDownloadHandler, _ cmd: String, _ args: [Stri
 }
 
 func iDownload_doit(_ hndlr: iDownloadHandler, _ cmd: String, _ args: [String]) throws {
-    try iDownload_tcload(hndlr, "tcload", [Bundle.main.bundleURL.appendingPathComponent("Fugu15_test.tc").path])
-    
-    try iDownload_rootfs(hndlr, "rootfs", ["/dev/disk0s1s9", "/dev/disk0s1s10", "/dev/disk0s1s11", "/dev/disk0s1s12", "/dev/disk0s1s13", "/dev/disk0s1s14"])
+    //try iDownload_rootfs(hndlr, "rootfs", ["/dev/disk0s1s9", "/dev/disk0s1s10", "/dev/disk0s1s11", "/dev/disk0s1s12", "/dev/disk0s1s13", "/dev/disk0s1s14"])
+    try iDownload_rootfs(hndlr, "rootfs", ["/dev/disk0s1s8", "/dev/disk0s1s9", "/dev/disk0s1s10", "/dev/disk0s1s11", "/dev/disk0s1s12", "/dev/disk0s1s13"])
     
     let FuFuGuGu = Bundle.main.bundleURL.appendingPathComponent("libFuFuGuGu.dylib").path
     let jbinjector = Bundle.main.bundleURL.appendingPathComponent("jbinjector.dylib").path
@@ -266,8 +266,12 @@ func iDownload_doit(_ hndlr: iDownloadHandler, _ cmd: String, _ args: [String]) 
     typealias ft = @convention(c) (_: UnsafePointer<CChar>) -> Int
     let f = unsafeBitCast(dlsym(hndl, "trustCDHashesForBinary"), to: ft.self)
     let res = f("/usr/bin/launchctl")
+    _ = f("/usr/bin/dash")
     
     try hndlr.sendline("trustCDHashesForBinary returned \(res)")
+    
+    setenv("DYLD_INSERT_LIBRARIES", "/usr/lib/jbinjector.dylib", 1)
+    setenv("DYLD_AMFI_FAKE", "0xFF", 1)
     
     try hndlr.sendline("OK")
 }
@@ -420,6 +424,8 @@ func iDownload_cleanup(_ hndlr: iDownloadHandler, _ cmd: String, _ args: [String
 }
 
 func iDownload_autorun(_ hndlr: iDownloadHandler, _ cmd: String, _ args: [String]) throws {
+    try iDownload_tcload(hndlr, "tcload", [Bundle.main.bundleURL.appendingPathComponent("Fugu15_test.tc").path])
+    
     if access("/private/preboot/jb/TrustCache", F_OK) == 0 {
         try iDownload_tcload(hndlr, "tcload", ["/private/preboot/jb/TrustCache"])
         _ = try? hndlr.exec("/sbin/mount", args: ["-u", "/private/preboot"])

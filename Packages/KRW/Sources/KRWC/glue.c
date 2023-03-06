@@ -12,6 +12,10 @@
 #include <string.h>
 #include <stdbool.h>
 
+extern int mcbc_run_exploit(void);
+extern uint64_t mcbc_kread64(void *);
+extern void mcbc_kwrite64(void *, uint64_t val);
+
 extern int exploit(void);
 extern void kwrite64(uint64_t address, uint64_t value);
 extern uint64_t kread64(uint64_t address);
@@ -74,10 +78,11 @@ int krw_init(patchfinder_get_offset_func _Nonnull func) {
         return 0;
     }
     
-    return exploit();
+    //return exploit();
+    return mcbc_run_exploit();
 }
 
-int krw_kread(uintptr_t kernSrc, void * _Nonnull dst, size_t size) {
+/*int krw_kread(uintptr_t kernSrc, void * _Nonnull dst, size_t size) {
     if (kernPort != 0) {
         vm_size_t outsize = 0;
         return vm_read_overwrite(kernPort, kernSrc, size, dst, &outsize);
@@ -128,6 +133,61 @@ int krw_kwrite(uintptr_t kernDst, const void * _Nonnull src, size_t size) {
 
 uintptr_t krw_kbase(void) {
     return gKernelBase;
+}*/
+
+int krw_kread(uintptr_t kernSrc, void * _Nonnull dst, size_t size) {
+    if (kernPort != 0) {
+        vm_size_t outsize = 0;
+        return vm_read_overwrite(kernPort, kernSrc, size, dst, &outsize);
+    }
+    
+    uint64_t *v32 = (uint64_t*) dst;
+    
+    while (size) {
+        size_t bytesToRead = (size > 8) ? 8 : size;
+        uint64_t value = mcbc_kread64(kernSrc);
+        kernSrc += 8;
+        
+        if (bytesToRead == 8) {
+            *v32++ = value;
+        } else {
+            memcpy(dst, &value, bytesToRead);
+        }
+        
+        size -= bytesToRead;
+    }
+    
+    return 0;
+}
+
+int krw_kwrite(uintptr_t kernDst, const void * _Nonnull src, size_t size) {
+    if (kernPort != 0) {
+        vm_size_t outsize = 0;
+        return vm_write(kernPort, kernDst, src, (mach_msg_type_number_t) size);
+    }
+    
+    uint8_t *v8 = (uint8_t*) src;
+    
+    while (size >= 8) {
+        mcbc_kwrite64(kernDst, *(uint64_t*)v8);
+        size -= 8;
+        v8 += 8;
+        kernDst += 8;
+    }
+    
+    if (size) {
+        uint64_t val = mcbc_kread64(kernDst);
+        memcpy(&val, v8, size);
+        mcbc_kwrite64(kernDst, val);
+    }
+    
+    return 0;
+}
+
+extern uintptr_t kernel_base;
+
+uintptr_t krw_kbase(void) {
+    return kernel_base;
 }
 
 bool kernread (uint64_t addr, size_t len, void *buffer) {
