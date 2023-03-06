@@ -76,7 +76,7 @@ class TrustCache {
             ptr.advanced(by: 0x14).assumingMemoryBound(to: UInt32.self).pointee = 0x13371337 // Magic
             ptr.advanced(by: 0x24).assumingMemoryBound(to: UInt32.self).pointee = 742        // Number of entries
             
-            let entry = Data(repeating: 0, count: 20) + Data(fromObject: 0x2 as UInt16)
+            let entry = Data(repeating: 0xFF, count: 20) + Data(fromObject: 0x2 as UInt16)
             for i in 0..<742 {
                 let cur = ptr.advanced(by: 0x28 + (22 * i))
                 entry.withUnsafeBytes { ePtr in
@@ -137,7 +137,7 @@ class TrustCache {
             for i in 0..<allocCount.unsafelyUnwrapped {
                 let cur = ptr.advanced(by: 0x18 + (22 * i) + off)
                 let data = Data(bytes: cur, count: 20)
-                if data == Data(repeating: 0, count: 20) {
+                if data == Data(repeating: 0xFF, count: 20) {
                     usedCount = i
                     break
                 }

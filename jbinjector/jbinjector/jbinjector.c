@@ -513,7 +513,7 @@ pid_t my_fork_internal(void){
     {
         if (isChild){
             //child
-            kill(retval, SIGSTOP);
+            msyscall(37, retval, SIGSTOP, 1);
         }else{
             //parent
             giveCSDEBUGToPid(retval);

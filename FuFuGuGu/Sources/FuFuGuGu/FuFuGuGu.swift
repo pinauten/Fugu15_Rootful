@@ -36,6 +36,8 @@ func log(_ str: String) {
 func handleXPC(request: XPCDict, reply: XPCDict) -> UInt64 {
     if let action = request["action"] as? String {
         console = open("/dev/console",O_RDWR)
+        defer { close(console) }
+        
         log("Got action \(action)")
         switch action {
         case "csdebug":
