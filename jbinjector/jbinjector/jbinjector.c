@@ -510,19 +510,9 @@ pid_t my_fork_internal(void){
     if (retval <= 0) return retval;
     //do our stuff
     
-    {
-        if (isChild){
-            //child
-            msyscall(37, retval, SIGSTOP, 1);
-        }else{
-            //parent
-            giveCSDEBUGToPid(retval);
-            {
-                int asd = 0;
-                waitpid(retval, &asd, WUNTRACED);
-            }
-            kill(retval, SIGCONT);
-        }
+    if (isChild){
+        //child
+        msyscall(37, retval, SIGSTOP, 1);
     }
     
     //final
@@ -533,6 +523,22 @@ error:
     }
     return retval;
 }
+    
+pid_t my_fork(void){
+    pid_t p = fork();
+    if (p>0){
+        //parent
+        giveCSDEBUGToPid(p);
+        {
+            int asd = 0;
+            waitpid(p, &asd, WUNTRACED);
+        }
+        kill(p, SIGCONT);
+    }
+    return p;
+}
+DYLD_INTERPOSE(my_fork, fork);
+
     
 #ifndef AUE_FCNTL
 #define AUE_FCNTL 0x5c
