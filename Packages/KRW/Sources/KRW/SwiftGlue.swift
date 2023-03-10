@@ -7,6 +7,7 @@
 //  
 
 import Foundation
+import KRWC
 
 @_cdecl("pcidev_r64")
 public func pcidev_r64(_ virt: UInt64) -> UInt64 {
@@ -68,4 +69,32 @@ public func getPageForPPL() -> UInt64 {
     }
     
     return (try? KRW.kcall(func: fSlid, a1: 0, a2: 0, a3: 0, a4: 0, a5: 0, a6: 0, a7: 0, a8: 0)) ?? 0
+}
+
+@_cdecl("krw_kread")
+public func krw_kread(_ kernSrc: UInt, _ dst: UnsafeMutableRawPointer, size: Int) -> Int32 {
+    switch KRW.selectedExploit.unsafelyUnwrapped {
+    case .tfp0:
+        return krw_kread_tfp0(kernSrc, dst, size)
+        
+    case .weightBufs:
+        return krw_kread_weightBufs(kernSrc, dst, size)
+        
+    case .mcbc:
+        return krw_kread_mcbc(kernSrc, dst, size)
+    }
+}
+
+@_cdecl("krw_kwrite")
+public func krw_kwrite(_ kernDst: UInt, _ src: UnsafeRawPointer, size: Int) -> Int32 {
+    switch KRW.selectedExploit.unsafelyUnwrapped {
+    case .tfp0:
+        return krw_kwrite_tfp0(kernDst, src, size)
+        
+    case .weightBufs:
+        return krw_kwrite_weightBufs(kernDst, src, size)
+        
+    case .mcbc:
+        return krw_kwrite_mcbc(kernDst, src, size)
+    }
 }

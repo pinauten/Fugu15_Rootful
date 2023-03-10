@@ -265,6 +265,64 @@ public class VMMap: KernelObject {
         
         return PMap(address: pmap)
     }
+    
+    public var links: VMMapLinks {
+        VMMapLinks(address: address + 0x10)
+    }
+}
+
+public class VMMapLinks: KernelObject {
+    public var previous: VMMapEntry? {
+        guard let previous = try? rPtr(offset: 0x00) else {
+            return nil
+        }
+        
+        guard previous != 0 else {
+            return nil
+        }
+        
+        return VMMapEntry(address: previous)
+    }
+    
+    public var next: VMMapEntry? {
+        guard let next = try? rPtr(offset: 0x08) else {
+            return nil
+        }
+        
+        guard next != 0 else {
+            return nil
+        }
+        
+        return VMMapEntry(address: next)
+    }
+    
+    public var start: UInt64? {
+        return try? r64(offset: 0x10)
+    }
+    
+    public var end: UInt64? {
+        return try? r64(offset: 0x18)
+    }
+}
+
+public class VMMapEntry: KernelObject {
+    public var links: VMMapLinks {
+        VMMapLinks(address: address + 0x00)
+    }
+    
+    public var bits: UInt64? {
+        get {
+            return try? r64(offset: 0x48)
+        }
+        
+        set {
+            guard let nv = newValue else {
+                return
+            }
+            
+            try? w64(offset: 0x48, value: nv)
+        }
+    }
 }
 
 public class PMap: KernelObject {
@@ -288,9 +346,14 @@ public class PMap: KernelObject {
     
     public var debugged: UInt8? {
         get {
+            var ALLOW_WX: UInt64 = 0xC2
+            if ProcessInfo.processInfo.operatingSystemVersion.majorVersion >= 15 && ProcessInfo.processInfo.operatingSystemVersion.minorVersion >= 2 {
+                ALLOW_WX = 0xC2
+            }
+            
             let adjust: UInt64 = (KRW.patchfinder.kernel_el == 2) ? 8 : 0
             
-            return try? r8(offset: 0xC2 + adjust)
+            return try? r8(offset: ALLOW_WX + adjust)
         }
         
         set {
@@ -298,9 +361,19 @@ public class PMap: KernelObject {
                 return
             }
             
+            var ALLOW_WX: UInt64 = 0xC2
+            if ProcessInfo.processInfo.operatingSystemVersion.majorVersion >= 15 && ProcessInfo.processInfo.operatingSystemVersion.minorVersion >= 2 {
+                ALLOW_WX = 0xC2
+            }
+            
             let adjust: UInt64 = (KRW.patchfinder.kernel_el == 2) ? 8 : 0
             
-            try? KRW.pplwrite(virt: self.address + 0xC2 + adjust, data: Data(fromObject: newValue.unsafelyUnwrapped))
+            /*try? KRW.pplwrite(virt: self.address + 0xC2 + adjust, data: Data(fromObject: newValue.unsafelyUnwrapped))
+            try? KRW.pplwrite(virt: self.address + 0xCA + adjust, data: Data(fromObject: 1 as UInt8))
+            try? KRW.pplwrite(virt: self.address + 0xC7 + adjust, data: Data(fromObject: 1 as UInt8))
+            try? KRW.pplwrite(virt: self.address + 0xC8 + adjust, data: Data(fromObject: 0 as UInt8))*/
+            try? KRW.pplwrite(virt: self.address + 0xC0 + adjust, data: Data(fromObject: 0x0101010101010101 as UInt64))
+            try? KRW.pplwrite(virt: self.address + 0xC8 + adjust, data: Data(fromObject: 0x0101010101010100 as UInt64))
         }
     }
 }

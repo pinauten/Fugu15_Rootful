@@ -21,6 +21,8 @@ public extension KRW {
             return
         }
         
+        logger("Status: Patchfinding")
+        
         gOffsets.slide = try kslide()
         gOffsets.allproc = (patchfinder.allproc!)
         gOffsets.itkSpace = patchfinder.ITK_SPACE!
@@ -49,6 +51,8 @@ public extension KRW {
         gOffsets.PORT_KOBJECT = 0
         gOffsets.VM_MAP_PMAP = patchfinder.VM_MAP_PMAP!
         gOffsets.PORT_LABEL = patchfinder.PORT_LABEL!
+        
+        logger("Status: Bypassing PAC")
         
         gOurTask = ourProc!.task!.address
         

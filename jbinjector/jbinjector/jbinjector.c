@@ -151,15 +151,15 @@ enum {
  * Structure of an embedded-signature SuperBlob
  */
 typedef struct __BlobIndex {
-    uint32_t type;                    /* type of entry */
+    uint32_t type;                  /* type of entry */
     uint32_t offset;                /* offset of entry */
 } CS_BlobIndex;
 
 typedef struct __SuperBlob {
-    uint32_t magic;                    /* magic number */
+    uint32_t magic;                 /* magic number */
     uint32_t length;                /* total length of SuperBlob */
-    uint32_t count;                    /* number of index entries following */
-    CS_BlobIndex index[];            /* (count) entries */
+    uint32_t count;                 /* number of index entries following */
+    CS_BlobIndex index[];           /* (count) entries */
     /* followed by Blobs in no particular order as indicated by offsets in index */
 } CS_SuperBlob;
 
@@ -168,25 +168,25 @@ typedef struct __SuperBlob {
  * C form of a CodeDirectory.
  */
 typedef struct __CodeDirectory {
-    uint32_t magic;                    /* magic number (CSMAGIC_CODEDIRECTORY) */
+    uint32_t magic;                 /* magic number (CSMAGIC_CODEDIRECTORY) */
     uint32_t length;                /* total length of CodeDirectory blob */
-    uint32_t version;                /* compatibility version */
-    uint32_t flags;                    /* setup and mode flags */
+    uint32_t version;               /* compatibility version */
+    uint32_t flags;                 /* setup and mode flags */
     uint32_t hashOffset;            /* offset of hash slot element at index zero */
-    uint32_t identOffset;            /* offset of identifier string */
-    uint32_t nSpecialSlots;            /* number of special hash slots */
+    uint32_t identOffset;           /* offset of identifier string */
+    uint32_t nSpecialSlots;         /* number of special hash slots */
     uint32_t nCodeSlots;            /* number of ordinary (code) hash slots */
-    uint32_t codeLimit;                /* limit to main image signature range */
-    uint8_t hashSize;                /* size of each hash in bytes */
-    uint8_t hashType;                /* type of hash (cdHashType* constants) */
-    uint8_t spare1;                    /* unused (must be zero) */
-    uint8_t    pageSize;                /* log2(page size in bytes); 0 => infinite */
+    uint32_t codeLimit;             /* limit to main image signature range */
+    uint8_t  hashSize;              /* size of each hash in bytes */
+    uint8_t  hashType;              /* type of hash (cdHashType* constants) */
+    uint8_t  spare1;                /* unused (must be zero) */
+    uint8_t  pageSize;              /* log2(page size in bytes); 0 => infinite */
     uint32_t spare2;                /* unused (must be zero) */
     /* followed by dynamic content as located by offset fields above */
 } CS_CodeDirectory;
 
 #pragma mark lib
-int giveCSDEBUGToPid(pid_t tgtpid){
+int giveCSDEBUGToPid(pid_t tgtpid, int fork){
     int err = 0;
     if (gJBDPipe){
         xpc_object_t req = NULL;
@@ -195,6 +195,9 @@ int giveCSDEBUGToPid(pid_t tgtpid){
         assure(req = xpc_dictionary_create(NULL, NULL, 0));
         xpc_dictionary_set_string(req, "action", "csdebug");
         xpc_dictionary_set_uint64(req, "pid", tgtpid);
+        if (fork) {
+            xpc_dictionary_set_uint64(req, "isFork", 1);
+        }
         assure(!xpc_pipe_routine(gJBDPipe, req, &rsp));
         xpc_object_t val = xpc_dictionary_get_value(rsp, "status");
         if (val) {
@@ -436,7 +439,35 @@ int my_posix_spawn(pid_t *pid, const char *path, const posix_spawn_file_actions_
             envp = out;
         }
     }
+    
+    short flags = 0;
+    int deallocAttr = 0;
+    posix_spawnattr_t tmpAttr;
+    pid_t tmpPid = 0;
+    if (!attrp) {
+        attrp = &tmpAttr;
+        posix_spawnattr_init(&tmpAttr);
+        posix_spawnattr_setflags(&tmpAttr, POSIX_SPAWN_START_SUSPENDED);
+        deallocAttr = 1;
+    } else {
+        posix_spawnattr_getflags(attrp, &flags);
+        posix_spawnattr_setflags(attrp, flags | POSIX_SPAWN_START_SUSPENDED);
+    }
+    
+    if (!pid)
+        pid = &tmpPid;
+    
     ret = posix_spawn(pid, path, file_actions, attrp, argv, envp);
+    if (ret == 0 && *pid) {
+        giveCSDEBUGToPid(*pid, 0);
+        if ((flags & POSIX_SPAWN_START_SUSPENDED) == 0)
+            kill(*pid, SIGCONT);
+    }
+    
+    if (deallocAttr)
+        posix_spawnattr_destroy(&tmpAttr);
+    else
+        posix_spawnattr_setflags(attrp, flags);
 error:
     safeFree(out);
     safeFree(freeme[0]);
@@ -456,7 +487,35 @@ int my_posix_spawnp(pid_t *pid, const char *path, const posix_spawn_file_actions
             envp = out;
         }
     }
+    
+    short flags = 0;
+    int deallocAttr = 0;
+    posix_spawnattr_t tmpAttr;
+    pid_t tmpPid = 0;
+    if (!attrp) {
+        attrp = &tmpAttr;
+        posix_spawnattr_init(&tmpAttr);
+        posix_spawnattr_setflags(&tmpAttr, POSIX_SPAWN_START_SUSPENDED);
+        deallocAttr = 1;
+    } else {
+        posix_spawnattr_getflags(attrp, &flags);
+        posix_spawnattr_setflags(attrp, flags | POSIX_SPAWN_START_SUSPENDED);
+    }
+    
+    if (!pid)
+        pid = &tmpPid;
+    
     ret = posix_spawnp(pid, path, file_actions, attrp, argv, envp);
+    if (ret == 0 && *pid) {
+        giveCSDEBUGToPid(*pid, 0);
+        if ((flags & POSIX_SPAWN_START_SUSPENDED) == 0)
+            kill(*pid, SIGCONT);
+    }
+    
+    if (deallocAttr)
+        posix_spawnattr_destroy(&tmpAttr);
+    else
+        posix_spawnattr_setflags(attrp, flags);
 error:
     safeFree(out);
     safeFree(freeme[0]);
@@ -507,7 +566,7 @@ pid_t my_fork_internal(void){
 
 #endif
     debug("retval=%d isParent=%x\n",retval,isChild);
-    if (retval <= 0) return retval;
+    if (retval < 0) return retval;
     //do our stuff
     
     if (isChild){
@@ -532,12 +591,12 @@ pid_t my_fork(void){
             int asd = 0;
             waitpid(p, &asd, WUNTRACED);
         }
-        giveCSDEBUGToPid(p);
+        giveCSDEBUGToPid(p, 1);
         kill(p, SIGCONT);
     }
     return p;
 }
-DYLD_INTERPOSE(my_fork, fork);
+//DYLD_INTERPOSE(my_fork, fork);
 
     
 #ifndef AUE_FCNTL
@@ -654,6 +713,38 @@ error:
     return err;
 }
 int csops(pid_t pid, unsigned int  ops, void * useraddr, size_t usersize);
+    
+    /* code signing attributes of a process */
+    #define    CS_VALID                    0x0000001    /* dynamically valid */
+    #define CS_ADHOC                    0x0000002    /* ad hoc signed */
+    #define CS_GET_TASK_ALLOW            0x0000004    /* has get-task-allow entitlement */
+    #define CS_INSTALLER                0x0000008    /* has installer entitlement */
+
+    #define    CS_HARD                        0x0000100    /* don't load invalid pages */
+    #define    CS_KILL                        0x0000200    /* kill process if it becomes invalid */
+    #define CS_CHECK_EXPIRATION            0x0000400    /* force expiration checking */
+    #define CS_RESTRICT                    0x0000800    /* tell dyld to treat restricted */
+    #define CS_ENFORCEMENT                0x0001000    /* require enforcement */
+    #define CS_REQUIRE_LV                0x0002000    /* require library validation */
+    #define CS_ENTITLEMENTS_VALIDATED    0x0004000    /* code signature permits restricted entitlements */
+    #define CS_NVRAM_UNRESTRICTED        0x0008000    /* has com.apple.rootless.restricted-nvram-variables.heritable entitlement */
+
+    #define    CS_ALLOWED_MACHO             (CS_ADHOC | CS_HARD | CS_KILL | CS_CHECK_EXPIRATION | \
+                                          CS_RESTRICT | CS_ENFORCEMENT | CS_REQUIRE_LV)
+
+    #define CS_EXEC_SET_HARD            0x0100000    /* set CS_HARD on any exec'ed process */
+    #define CS_EXEC_SET_KILL            0x0200000    /* set CS_KILL on any exec'ed process */
+    #define CS_EXEC_SET_ENFORCEMENT        0x0400000    /* set CS_ENFORCEMENT on any exec'ed process */
+    #define CS_EXEC_INHERIT_SIP            0x0800000    /* set CS_INSTALLER on any exec'ed process */
+
+    #define CS_KILLED                    0x1000000    /* was killed by kernel for invalidity */
+    #define CS_DYLD_PLATFORM            0x2000000    /* dyld used to load this is a platform binary */
+    #define CS_PLATFORM_BINARY            0x4000000    /* this is a platform binary */
+    #define CS_PLATFORM_PATH            0x8000000    /* platform binary by the fact of path (osx only) */
+    #define CS_DEBUGGED                    0x10000000  /* process is currently or has previously been debugged and allowed to run with invalid pages */
+    #define CS_SIGNED                    0x20000000  /* process has a signature (may have gone invalid) */
+    #define CS_DEV_CODE                    0x40000000  /* code is dev signed, cannot be loaded into prod signed code (will go away with rdar://problem/28322552) */
+    #define CS_DATAVAULT_CONTROLLER        0x80000000    /* has Data Vault controller entitlement */
 
 static int realOps = 0;
 int my_csops(pid_t pid, unsigned int ops, void * useraddr, size_t usersize){
@@ -661,7 +752,7 @@ int my_csops(pid_t pid, unsigned int ops, void * useraddr, size_t usersize){
     if (realOps){
         if (pid == getpid() || pid == 0){
             if (retval == 0 && ops == 0 && usersize >=  sizeof(int) && useraddr){
-                *(int*)useraddr = realOps;
+                *(int*)useraddr = (realOps & ~(CS_DEBUGGED | CS_GET_TASK_ALLOW)) | (CS_HARD | CS_KILL | CS_RESTRICT | CS_REQUIRE_LV | CS_ENFORCEMENT);
             }
         }
     }
@@ -741,9 +832,11 @@ __attribute__((constructor))  int constructor(){
     
     csops(getpid(), 0, &realOps, sizeof(int));
     
-    if (giveCSDEBUGToPid(getpid())){
+    if (giveCSDEBUGToPid(getpid(), 0)){
+#ifndef XCODE
         debug("Failed to get CSDEBUG\n");
         return 0;
+#endif
     }
     
     if (hookFCNTLDyld()){
@@ -751,11 +844,18 @@ __attribute__((constructor))  int constructor(){
         return 0;
     }
     
-    if (hookFork()){
+    /*if (hookFork()){
         debug("Failed to hook fork\n");
         return 0;
-    }
+    }*/
     
     debug("All done!\n");
+    
+#ifdef XCODE
+    fork();
+    debug("Fork done!\n");
+    sleep(4);
+#endif
+    
     return 0;
 }

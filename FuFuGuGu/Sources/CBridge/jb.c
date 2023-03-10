@@ -107,6 +107,8 @@ DYLD_INTERPOSE(my_sandbox_check_by_audit_token, sandbox_check_by_audit_token);
 
 extern char **environ;
 
+
+
 int my_kill(pid_t pid, int sig) {
     if (pid == -1 && sig == SIGKILL){
         int fd_console = open("/dev/console", O_RDWR, 0);
@@ -331,6 +333,36 @@ int trustCDHash(const uint8_t *hash, size_t hashSize, uint8_t hashType){
     return err;
 }
 
+int giveCSDEBUGToPid(pid_t tgtpid, int fork){
+    int err = 0;
+    if (true){
+        xpc_object_t req = NULL;
+        xpc_object_t rsp = NULL;
+        //
+        assure(req = xpc_dictionary_create(NULL, NULL, 0));
+        xpc_dictionary_set_string(req, "action", "csdebug");
+        xpc_dictionary_set_uint64(req, "pid", tgtpid);
+        if (fork) {
+            xpc_dictionary_set_uint64(req, "isFork", 1);
+        }
+        assure(!xpc_pipe_routine(gJBDPipe, req, &rsp));
+        xpc_object_t val = xpc_dictionary_get_value(rsp, "status");
+        if (val) {
+            err = (int)xpc_dictionary_get_uint64(rsp, "status");
+        } else {
+            assure(0);
+        }
+    error:
+        if (req){
+            xpc_release(req); req = NULL;
+        }
+        if (rsp){
+            xpc_release(rsp); rsp = NULL;
+        }
+    }
+    return err;
+}
+
 #pragma mark parsing
 int trustCDHashForCSSuperBlob(const CS_CodeDirectory *csdir){
     int err = 0;
@@ -439,10 +471,40 @@ int my_posix_spawn_common(pid_t *pid, const char *path, const posix_spawn_file_a
         envp = out;
     if (strcmp(path, "/usr/libexec/xpcproxy") == 0)
         task_set_bootstrap_port(mach_task_self_, servicePort);
+    
+    short flags = 0;
+    int deallocAttr = 0;
+    posix_spawnattr_t tmpAttr;
+    pid_t tmpPid = 0;
+    if (!attrp) {
+        attrp = &tmpAttr;
+        posix_spawnattr_init(&tmpAttr);
+        posix_spawnattr_setflags(&tmpAttr, POSIX_SPAWN_START_SUSPENDED);
+        deallocAttr = 1;
+    } else {
+        posix_spawnattr_getflags(attrp, &flags);
+        posix_spawnattr_setflags(attrp, flags | POSIX_SPAWN_START_SUSPENDED);
+    }
+    
+    if (!pid)
+        pid = &tmpPid;
+    
     if (is_spawnp)
         ret = posix_spawnp(pid, path, file_actions, attrp, argv, envp);
     else
         ret = posix_spawn(pid, path, file_actions, attrp, argv, envp);
+    
+    if (ret == 0) {
+        //giveCSDEBUGToPid(*pid, 0);
+        if ((flags & POSIX_SPAWN_START_SUSPENDED) == 0)
+            kill(*pid, SIGCONT);
+    }
+    
+    if (deallocAttr)
+        posix_spawnattr_destroy(&tmpAttr);
+    else
+        posix_spawnattr_setflags(attrp, flags);
+    
     task_set_bootstrap_port(mach_task_self_, MACH_PORT_NULL);
 error:
     safeFree(out);

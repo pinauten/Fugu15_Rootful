@@ -62,10 +62,12 @@ func ensureFuguPartition(name: String, realPath: String, rootfs: String) throws 
     return "/dev/" + device
 }
 
+#if os(iOS)
 func main() throws {
     //let rootfs = try mount(volume: rootDiskVolume)
     //defer { try? umount(mountPoint: rootfs, allowForce: true) }
-    let rootfs = "/private/var/mnt/rootfs"
+    //let rootfs = "/private/var/mnt/rootfs"
+    let rootfs = "/"
     
     let app  = try ensureFuguPartition(name: "Fugu15App", realPath: "/Applications", rootfs: rootfs)
     let lib  = try ensureFuguPartition(name: "Fugu15Lib", realPath: "/Library", rootfs: rootfs)
@@ -81,6 +83,16 @@ func main() throws {
     print("PART SBIN: \(sbin)")
     print("PART USR: \(usr)")
 }
+#else
+func main() throws {
+    guard CommandLine.arguments.count == 4 else {
+        print("Usage: bootstrapFS <real dyld> <patched dyld out> <trust cache out>")
+        exit(-1)
+    }
+    
+    try patchDYLD(real: CommandLine.arguments[1], patched: CommandLine.arguments[2], trustCache: CommandLine.arguments[3])
+}
+#endif
 
 do {
     try main()

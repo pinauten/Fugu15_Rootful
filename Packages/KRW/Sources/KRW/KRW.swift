@@ -19,16 +19,17 @@ public enum KRWError: Error {
     case failedToGetKObject(ofPort: mach_port_t)
 }
 
-fileprivate func get_offset(_ name: UnsafePointer<CChar>) -> UInt {
-    let str = String(cString: name)
-    
-    KRW.logger(str)
-    
-    return 0
+public enum KRWExploit {
+    case tfp0
+    case weightBufs
+    case mcbc
 }
 
 public class KRW {
-    private  static var didInit      = false
+    private static var didInit: Bool {
+        selectedExploit != nil
+    }
+    
     internal static var didInitPAC   = false
     internal static var didInitPPL   = false
     internal static var didInitPPLRW = false
@@ -46,6 +47,9 @@ public class KRW {
     internal static var scratchMemoryMapped: UnsafeMutablePointer<UInt64>!
     internal static var kernelStack: UInt64!
     internal static var kcallThread: mach_port_t!
+    
+    public static var exploitToUse: KRWExploit?
+    public private(set) static var selectedExploit: KRWExploit?
     
     public private(set) static var ourProc: Proc? = {
         try? Proc(pid: getpid())
@@ -70,12 +74,76 @@ public class KRW {
             return
         }
         
-        let res = krw_init(get_offset)
+        logger("Status: Gaining KRW")
+        
+        if let exploit = exploitToUse {
+            switch exploit {
+            case .tfp0:
+                var tfp0: mach_port_t = 0
+                let kr = task_for_pid(mach_task_self_, 0, &tfp0)
+                if kr == KERN_SUCCESS {
+                    krw_init_tfp0(tfp0)
+                    selectedExploit = .tfp0
+                    return
+                }
+                
+                throw KRWError.failed(providerError: kr)
+                
+            case .weightBufs:
+                let res = krw_init_weightBufs()
+                guard res == 0 else {
+                    throw KRWError.failed(providerError: res)
+                }
+                
+                selectedExploit = .weightBufs
+                return
+                
+            case .mcbc:
+                let res = krw_init_mcbc()
+                guard res == 0 else {
+                    throw KRWError.failed(providerError: res)
+                }
+                
+                selectedExploit = .mcbc
+                return
+            }
+        }
+        
+        logger("No exploit selected -> Choosing one automatically")
+        
+        // Select an exploit
+        // Try tfp0 first
+        var tfp0: mach_port_t = 0
+        if task_for_pid(mach_task_self_, 0, &tfp0) == KERN_SUCCESS {
+            logger("Automatically selected tfp0")
+            krw_init_tfp0(tfp0)
+            selectedExploit = .tfp0
+            return
+        }
+        
+        // On a stock device, check if mcbc is supported
+        // If it is, use it
+        let vers = ProcessInfo.processInfo.operatingSystemVersion
+        if vers.majorVersion >= 15 && vers.minorVersion < 2 {
+            logger("Automatically selected mcbc")
+            if krw_init_mcbc() == 0 {
+                selectedExploit = .mcbc
+                return
+            }
+            
+            logger("mcbc failed!")
+        }
+        
+        logger("Automatically selected weightBufs")
+        
+        // Finally, try weightBufs
+        let res = krw_init_weightBufs()
         guard res == 0 else {
+            logger("weightBufs -> No more exploits to try!")
             throw KRWError.failed(providerError: res)
         }
         
-        didInit = true
+        selectedExploit = .weightBufs
     }
     
     public static func kread(virt: UInt64, size: Int) throws -> Data {
@@ -87,7 +155,16 @@ public class KRW {
         
         var data = Data(repeating: 0, count: size)
         let res = data.withUnsafeMutableBytes { ptr in
-            krw_kread(UInt(virt), ptr.baseAddress!, size)
+            switch selectedExploit.unsafelyUnwrapped {
+            case .tfp0:
+                return krw_kread_tfp0(UInt(virt), ptr.baseAddress!, size)
+                
+            case .weightBufs:
+                return krw_kread_weightBufs(UInt(virt), ptr.baseAddress!, size)
+                
+            case .mcbc:
+                return krw_kread_mcbc(UInt(virt), ptr.baseAddress!, size)
+            }
         }
         
         guard res == 0 else {
@@ -135,7 +212,16 @@ public class KRW {
         try doInit()
         
         let res = data.withUnsafeBytes { ptr in
-            krw_kwrite(UInt(virt), ptr.baseAddress!, ptr.count)
+            switch selectedExploit.unsafelyUnwrapped {
+            case .tfp0:
+                return krw_kwrite_tfp0(UInt(virt), ptr.baseAddress!, ptr.count)
+                
+            case .weightBufs:
+                return krw_kwrite_weightBufs(UInt(virt), ptr.baseAddress!, ptr.count)
+                
+            case .mcbc:
+                return krw_kwrite_mcbc(UInt(virt), ptr.baseAddress!, ptr.count)
+            }
         }
         
         guard res == 0 else {
@@ -166,7 +252,16 @@ public class KRW {
     public static func kbase() throws -> UInt64 {
         try doInit()
         
-        return UInt64(krw_kbase())
+        switch selectedExploit.unsafelyUnwrapped {
+        case .tfp0:
+            return UInt64(krw_kbase_tfp0())
+            
+        case .weightBufs:
+            return UInt64(krw_kbase_weightBufs())
+            
+        case .mcbc:
+            return UInt64(krw_kbase_mcbc())
+        }
     }
     
     public static func kslide() throws -> UInt64 {
@@ -175,5 +270,22 @@ public class KRW {
     
     public static func slide(virt: UInt64) throws -> UInt64 {
         try virt + Self.kslide()
+    }
+    
+    public static func cleanup() {
+        guard let exploit = selectedExploit else {
+            return
+        }
+        
+        switch exploit {
+        case .tfp0:
+            krw_cleanup_tfp0()
+            
+        case .weightBufs:
+            krw_cleanup_weightBufs()
+            
+        case .mcbc:
+            krw_cleanup_mcbc()
+        }
     }
 }

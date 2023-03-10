@@ -19,6 +19,9 @@ enum PatchDYLDError: Error {
     case noCmpBranch
     case posixSpawnFailed(prog: String)
     case childFailed(prog: String, args: [String])
+    case cs_invalid_strNotFound
+    case cs_invalid_str_xrefNotFound
+    case cs_invalid_str_cmpNotFound
 }
 
 func getProcOutput(prog: String, args: [String]) throws -> String {
@@ -156,12 +159,39 @@ func patchDYLD(real: String, patched: String, trustCache: String) throws {
         nopB = Int((xref + 0x18) - text.baseAddress)
     }
     
+    // Also patch fcntl stuff
+    guard let cs_invalid_str = cstr.addrOf("code signature invalid (errno=%d)") else {
+        throw PatchDYLDError.cs_invalid_strNotFound
+    }
+    
+    // Find xref to this
+    guard let cs_invalid_jmp = text.findNextXref(to: cs_invalid_str, optimization: .noBranches) else {
+        throw PatchDYLDError.cs_invalid_str_xrefNotFound
+    }
+    
+    // Find xref to this jump
+    var pc = cs_invalid_jmp
+    var cs_invalid_jmp_xref: UInt64?
+    while cs_invalid_jmp_xref == nil {
+        pc -= 4
+        cs_invalid_jmp_xref = text.findNextXref(to: pc, optimization: .onlyBranches)
+    }
+    
+    // Patch cs_invalid_jmp_xref to nop
+    // Afterwards, there should be a cmp and b.cs
+    // Patch that cmp to cmp x8, x8
+    guard text.instruction(at: cs_invalid_jmp_xref.unsafelyUnwrapped + 0xC) == 0xEB09011F else {
+        throw PatchDYLDError.cs_invalid_str_cmpNotFound
+    }
+    
     // XXX: Assuming contiguous MachO
     var data = machO.data
     data.withUnsafeMutableBytes { ptr in
         let base = ptr.baseAddress!
         base.advanced(by: nopA).assumingMemoryBound(to: UInt32.self).pointee = 0xD503201F
         base.advanced(by: nopB).assumingMemoryBound(to: UInt32.self).pointee = 0xD503201F
+        base.advanced(by: Int(cs_invalid_jmp_xref.unsafelyUnwrapped)).assumingMemoryBound(to: UInt32.self).pointee = 0xD503201F
+        base.advanced(by: Int(cs_invalid_jmp_xref.unsafelyUnwrapped + 0xC)).assumingMemoryBound(to: UInt32.self).pointee = 0xEB08011F
     }
     
     try data.write(to: URL(fileURLWithPath: patched))

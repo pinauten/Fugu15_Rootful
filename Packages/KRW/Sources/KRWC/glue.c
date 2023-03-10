@@ -12,25 +12,167 @@
 #include <string.h>
 #include <stdbool.h>
 
-extern int mcbc_run_exploit(void);
-extern uint64_t mcbc_kread64(void *);
-extern void mcbc_kwrite64(void *, uint64_t val);
-
-extern int exploit(void);
-extern void kwrite64(uint64_t address, uint64_t value);
-extern uint64_t kread64(uint64_t address);
-extern uint32_t kread32(uint64_t address);
-extern uintptr_t gKernelBase;
-
+// Stuff needed for badRecovery/tlbFail
 KernelOffsetInfo gOffsets;
 uint64_t gOurTask;
 uint64_t gKernelPmap;
 
-mach_port_t kernPort = 0;
+// tfp0
+mach_port_t tfp0KernPort = 0;
+uint64_t    tfp0KBase    = 0;
 
-int krw_init(patchfinder_get_offset_func _Nonnull func) {
+// weightBufs
+extern int exploit(void);
+extern void kwrite64(uint64_t address, uint64_t value);
+extern uint64_t kread64(uint64_t address);
+extern uint32_t kread32(uint64_t address);
+extern void cleanup(void);
+extern uintptr_t gKernelBase;
+
+// mcbc
+extern int mcbc_run_exploit(void);
+extern uint64_t mcbc_kread64(void *);
+extern void mcbc_kwrite64(void *, uint64_t val);
+extern void exploitation_cleanup(void);
+extern uintptr_t kernel_base;
+
+void krw_init_tfp0(mach_port_t port) {
+    tfp0KernPort = port;
+    
+    uintptr_t base = 0;
+    asm volatile(
+        "mov x16, 213\n"
+        "svc 0x80\n"
+        "mov %0, x0\n"
+        : "=r"(base)
+    );
+    
+    tfp0KBase = base << 0xC;
+}
+
+int krw_init_weightBufs(void) {
+    return exploit();
+}
+
+int krw_init_mcbc(void) {
+    return mcbc_run_exploit();
+}
+
+void krw_cleanup_tfp0(void) {
+    // Nothing to clean up
+}
+
+int krw_cleanup_weightBufs(void) {
+    cleanup();
+}
+
+int krw_cleanup_mcbc(void) {
+    exploitation_cleanup();
+}
+
+int krw_kread_tfp0(uintptr_t kernSrc, void * _Nonnull dst, size_t size) {
+    vm_size_t outsize = 0;
+    return vm_read_overwrite(tfp0KernPort, kernSrc, size, dst, &outsize);
+}
+
+int krw_kwrite_tfp0(uintptr_t kernDst, const void * _Nonnull src, size_t size) {
+    vm_size_t outsize = 0;
+    return vm_write(tfp0KernPort, kernDst, src, (mach_msg_type_number_t) size);
+}
+
+uintptr_t krw_kbase_tfp0(void) {
+    return tfp0KBase;
+}
+
+int krw_kread_weightBufs(uintptr_t kernSrc, void * _Nonnull dst, size_t size) {
+    uint32_t *v32 = (uint32_t*) dst;
+    
+    while (size) {
+        size_t bytesToRead = (size > 4) ? 4 : size;
+        uint32_t value = kread32(kernSrc);
+        kernSrc += 4;
+        
+        if (bytesToRead == 4) {
+            *v32++ = value;
+        } else {
+            memcpy(dst, &value, bytesToRead);
+        }
+        
+        size -= bytesToRead;
+    }
+    
+    return 0;
+}
+
+int krw_kwrite_weightBufs(uintptr_t kernDst, const void * _Nonnull src, size_t size) {
+    uint8_t *v8 = (uint8_t*) src;
+    
+    while (size >= 8) {
+        kwrite64(kernDst, *(uint64_t*)v8);
+        size -= 8;
+        v8 += 8;
+        kernDst += 8;
+    }
+    
+    if (size) {
+        uint64_t val = kread64(kernDst);
+        memcpy(&val, v8, size);
+        kwrite64(kernDst, val);
+    }
+    
+    return 0;
+}
+
+uintptr_t krw_kbase_weightBufs(void) {
+    return gKernelBase;
+}
+
+int krw_kread_mcbc(uintptr_t kernSrc, void * _Nonnull dst, size_t size) {
+    uint64_t *v32 = (uint64_t*) dst;
+    
+    while (size) {
+        size_t bytesToRead = (size > 8) ? 8 : size;
+        uint64_t value = mcbc_kread64(kernSrc);
+        kernSrc += 8;
+        
+        if (bytesToRead == 8) {
+            *v32++ = value;
+        } else {
+            memcpy(dst, &value, bytesToRead);
+        }
+        
+        size -= bytesToRead;
+    }
+    
+    return 0;
+}
+
+int krw_kwrite_mcbc(uintptr_t kernDst, const void * _Nonnull src, size_t size) {
+    uint8_t *v8 = (uint8_t*) src;
+    
+    while (size >= 8) {
+        mcbc_kwrite64(kernDst, *(uint64_t*)v8);
+        size -= 8;
+        v8 += 8;
+        kernDst += 8;
+    }
+    
+    if (size) {
+        uint64_t val = mcbc_kread64(kernDst);
+        memcpy(&val, v8, size);
+        mcbc_kwrite64(kernDst, val);
+    }
+    
+    return 0;
+}
+
+uintptr_t krw_kbase_mcbc(void) {
+    return tfp0KBase;
+}
+
+/*int krw_init(patchfinder_get_offset_func _Nonnull func) {
     if (task_for_pid(mach_task_self_, 0, &kernPort) == KERN_SUCCESS) {
-        /*asm volatile(
+        asm volatile(
             "mov x0, 0\n"
                      "mov x1, 1\n"
                      "mov x2, 2\n"
@@ -63,7 +205,7 @@ int krw_init(patchfinder_get_offset_func _Nonnull func) {
                      "mov x29, 29\n"
             "mov x16, 214\n"
             "svc 0x80\n"
-        );*/
+        );
         
         uintptr_t base = 0;
         asm volatile(
@@ -80,7 +222,7 @@ int krw_init(patchfinder_get_offset_func _Nonnull func) {
     
     //return exploit();
     return mcbc_run_exploit();
-}
+}*/
 
 /*int krw_kread(uintptr_t kernSrc, void * _Nonnull dst, size_t size) {
     if (kernPort != 0) {
@@ -135,7 +277,7 @@ uintptr_t krw_kbase(void) {
     return gKernelBase;
 }*/
 
-int krw_kread(uintptr_t kernSrc, void * _Nonnull dst, size_t size) {
+/*int krw_kread(uintptr_t kernSrc, void * _Nonnull dst, size_t size) {
     if (kernPort != 0) {
         vm_size_t outsize = 0;
         return vm_read_overwrite(kernPort, kernSrc, size, dst, &outsize);
@@ -188,9 +330,9 @@ extern uintptr_t kernel_base;
 
 uintptr_t krw_kbase(void) {
     return kernel_base;
-}
+}*/
 
-bool kernread (uint64_t addr, size_t len, void *buffer) {
+bool kernread(uint64_t addr, size_t len, void *buffer) {
     return krw_kread(addr, buffer, len) == 0;
 }
 

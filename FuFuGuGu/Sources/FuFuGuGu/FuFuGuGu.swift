@@ -42,15 +42,40 @@ func handleXPC(request: XPCDict, reply: XPCDict) -> UInt64 {
         switch action {
         case "csdebug":
             if let pid = request["pid"] as? UInt64 {
-                let proc = try? Proc(pid: pid_t(pid))
-                if let proc_ro = proc?.ro {
-                    if let flags = proc_ro.cs_flags {
-                        proc_ro.cs_flags = (flags & ~0x703b10) | 0x10000024
-                        guard let pmap = proc?.task?.vmMap?.pmap else {
+                if let proc = try? Proc(pid: pid_t(pid)) {
+                    if let flags = proc.cs_flags {
+                        proc.cs_flags = (flags & ~0x703b10) | 0x10000024
+                        guard let pmap = proc.task?.vmMap?.pmap else {
                             return 4
                         }
                         
                         pmap.debugged = 1
+                        
+                        //if let fork = request["isFork"] as? UInt64,
+                        //   fork != 0 {
+                        /*do {
+                            // Okay, now this is gonna be interesting
+                            // Make everything executable
+                            guard let links = proc.task?.vmMap?.links else {
+                                return 5
+                            }
+                            
+                            let map = links.address
+                            var cur = links.next
+                            while cur != nil && cur.unsafelyUnwrapped.address != map {
+                                guard let bits = cur.unsafelyUnwrapped.bits else {
+                                    return 6
+                                }
+                                
+                                /*let mProt = bits >> 11
+                                let prot  = bits >> 7
+                                if (mProt & UInt64(VM_PROT_EXECUTE)) == 0 && (prot & UInt64(VM_PROT_WRITE)) == 0 {
+                                    cur.unsafelyUnwrapped.bits = bits | (UInt64(VM_PROT_EXECUTE) << 11) | (UInt64(VM_PROT_EXECUTE) << 7)
+                                }*/
+                                
+                                cur = cur.unsafelyUnwrapped.links.next
+                            }
+                        }*/
                         
                         return 0
                     } else {

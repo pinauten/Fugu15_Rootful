@@ -108,8 +108,6 @@ struct JailbreakView: View {
     
     func launchExploit() {
         do {
-            statusUpdate("Status: Launching kexploitd")
-            
             /*let krw = try Fugu15DKKRW(oobPCI: Bundle.main.bundleURL.appendingPathComponent("oobPCI")) { msg in
                 if status != .done {
                     DispatchQueue.main.async {

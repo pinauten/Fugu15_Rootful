@@ -25,29 +25,10 @@ let iDownloadCmds = [
     "env": iDownload_env,
     "chmod": iDownload_chmod,
     "stashd": iDownload_stashd,
-    "pivot_root": iDownload_pivotRoot,
     "rsc": iDownload_rsc,
-    "hax": iDownload_hax,
-    "installDYLD": iDownload_installDYLD,
-    "unhax": iDownload_unhax,
     "rootfs": iDownload_rootfs,
-    "doit": iDownload_doit,
-    "test": iDownload_test
+    "doit": iDownload_doit
 ] as [String: iDownloadCmd]
-
-func iDownload_test(_ hndlr: iDownloadHandler, _ cmd: String, _ args: [String]) throws {
-    /*let cpu_ttep = try KRW.r64(virt: KRW.slide(virt: KRW.patchfinder.cpu_ttep!))
-    
-    try KRW.initPPLBypass(inProcess: getpid())
-    
-    PPLRW.initialize(magicPage: PPL_MAP_ADDR, cpuTTEP: cpu_ttep)
-    
-    let tc = TrustCache()
-    
-    tc?.append(hash: Data(repeating: 0x11, count: 20))
-    tc?.append(hash: Data(repeating: 0x22, count: 20))
-    tc?.append(hash: Data(repeating: 0x01, count: 20))*/
-}
 
 func iDownload_help(_ hndlr: iDownloadHandler, _ cmd: String, _ args: [String]) throws {
     try hndlr.sendline("tcload <path to TrustCache>: Load a TrustCache")
@@ -57,15 +38,17 @@ func iDownload_help(_ hndlr: iDownloadHandler, _ cmd: String, _ args: [String]) 
 }
 
 func pivot_root(new: String, old: String) throws -> UInt64 {
+    guard let pivot_root_addr = KRW.patchfinder.pivot_root else {
+        throw KRWError.patchfinderFailed(symbol: "pivot_root")
+    }
+    
     let bufferNew = try KRW.alloc(size: UInt64(new.count) + 1)
     let bufferOld = try KRW.alloc(size: UInt64(old.count) + 1)
     
     try KRW.kwrite(virt: bufferNew, data: new.data(using: .utf8)!)
     try KRW.kwrite(virt: bufferOld, data: old.data(using: .utf8)!)
     
-    //return try KRW.kcall(func: KRW.slide(virt: 0xFFFFFFF007D0D8C0), a1: bufferNew, a2: bufferOld, a3: 0, a4: 0, a5: 0, a6: 0, a7: 0, a8: 0)
-    //return try KRW.kcall(func: KRW.slide(virt: 0xFFFFFFF007CE32C8), a1: bufferNew, a2: bufferOld, a3: 0, a4: 0, a5: 0, a6: 0, a7: 0, a8: 0)
-    return try KRW.kcall(func: KRW.slide(virt: 0xFFFFFFF007DB3C14), a1: bufferNew, a2: bufferOld, a3: 0, a4: 0, a5: 0, a6: 0, a7: 0, a8: 0)
+    return try KRW.kcall(func: KRW.slide(virt: pivot_root_addr), a1: bufferNew, a2: bufferOld, a3: 0, a4: 0, a5: 0, a6: 0, a7: 0, a8: 0)
 }
 
 func iDownload_rootfs(_ hndlr: iDownloadHandler, _ cmd: String, _ args: [String]) throws {
@@ -73,6 +56,8 @@ func iDownload_rootfs(_ hndlr: iDownloadHandler, _ cmd: String, _ args: [String]
         try hndlr.sendline("Usage: rootfs <app part> <lib part> <bin part> <etc part> <sbin part> <usr part>")
         return
     }
+    
+    try FileManager.default.createDirectory(atPath: "/private/var/mnt", withIntermediateDirectories: true)
     
     // Mount new tempfs
     let mp = "/private/var/mnt/Fugu15"
@@ -88,6 +73,7 @@ func iDownload_rootfs(_ hndlr: iDownloadHandler, _ cmd: String, _ args: [String]
     try FileManager.default.copyItem(atPath: "/System/Library/Filesystems/apfs.fs/mount_apfs", toPath: mp + "/bin/mount_apfs")
     
     // Create private/var/mnt dir
+    try FileManager.default.createDirectory(atPath: "/private/var/mnt/real", withIntermediateDirectories: true)
     try FileManager.default.createDirectory(atPath: mp + "/private/var/mnt/real", withIntermediateDirectories: true)
     
     // And dev
@@ -123,72 +109,6 @@ func iDownload_rootfs(_ hndlr: iDownloadHandler, _ cmd: String, _ args: [String]
     try hndlr.sendline("OK")
 }
 
-func iDownload_unhax(_ hndlr: iDownloadHandler, _ cmd: String, _ args: [String]) throws {
-    // Switch rootfs
-    _ = try pivot_root(new: "/private/var/mnt/Fugu15", old: "private/var/mnt/real")
-    
-    // Do unmount
-    unmount("/private/var/mnt/real/usr/lib", MNT_FORCE);
-    
-    // Switch back
-    _ = try pivot_root(new: "/private/var/mnt/real", old: "private/var/mnt/Fugu15")
-    
-    // Done!
-    try hndlr.sendline("OK")
-}
-
-func iDownload_installDYLD(_ hndlr: iDownloadHandler, _ cmd: String, _ args: [String]) throws {
-    try FileManager.default.removeItem(atPath: "/private/var/mnt/Fugu15/usr/lib/dyld")
-    try FileManager.default.copyItem(atPath: "/var/mobile/Media/dyld_working", toPath: "/private/var/mnt/Fugu15/usr/lib/dyld")
-    chmod("/private/var/mnt/Fugu15/usr/lib/dyld", 0o755)
-    try hndlr.sendline("OK")
-}
-
-func iDownload_hax(_ hndlr: iDownloadHandler, _ cmd: String, _ args: [String]) throws {
-    // Mount new tempfs
-    let mp = "/private/var/mnt/Fugu15"
-    mkdir(mp, 0o700)
-    _ = try hndlr.exec("/sbin/mount_tmpfs", args: [mp])
-    
-    // Copy /usr/lib to it
-    mkdir(mp + "/usr", 0o700)
-    try FileManager.default.copyItem(atPath: "/usr/lib", toPath: mp + "/usr/lib")
-    
-    // Replace dyld
-    try FileManager.default.removeItem(atPath: "/private/var/mnt/Fugu15/usr/lib/dyld")
-    try FileManager.default.copyItem(atPath: Bundle.main.bundlePath + "/dyld_hax", toPath: "/private/var/mnt/Fugu15/usr/lib/dyld")
-    chmod("/private/var/mnt/Fugu15/usr/lib/dyld", 0o755)
-    chown("/private/var/mnt/Fugu15/usr/lib/dyld", 0, 0)
-    
-    // Copy libFuFuGuGu.dylib
-    try FileManager.default.copyItem(atPath: Bundle.main.bundlePath + "/libFuFuGuGu.dylib", toPath: "/private/var/mnt/Fugu15/usr/lib/libFuFuGuGu.dylib")
-    chmod("/private/var/mnt/Fugu15/usr/lib/libFuFuGuGu.dylib", 0o755)
-    chown("/private/var/mnt/Fugu15/usr/lib/libFuFuGuGu.dylib", 0, 0)
-    
-    // Create private/var/mnt dir
-    try FileManager.default.createDirectory(atPath: mp + "/private/var/mnt/real", withIntermediateDirectories: true)
-    
-    // And bin, dev
-    mkdir(mp + "/bin", 0o700)
-    mkdir(mp + "/dev", 0o700)
-    
-    // Copy bindmount binary
-    try FileManager.default.copyItem(atPath: Bundle.main.bundlePath + "/bindmount", toPath: mp + "/bin/bindmount")
-    chmod(mp + "/bin/bindmount", 0o755)
-    
-    // Switch rootfs
-    _ = try pivot_root(new: mp, old: "private/var/mnt/real")
-    
-    // Do bindmount
-    _ = try hndlr.exec("/bin/bindmount", args: ["/usr/lib", "/private/var/mnt/real/usr/lib"])
-    
-    // Switch back
-    _ = try pivot_root(new: "/private/var/mnt/real", old: "private/var/mnt/Fugu15")
-    
-    // Done!
-    try hndlr.sendline("OK")
-}
-
 func iDownload_rsc(_ hndlr: iDownloadHandler, _ cmd: String, _ args: [String]) throws {
     if args.count != 1 {
         try hndlr.sendline("Usage: rsc <resource name>")
@@ -203,32 +123,9 @@ func iDownload_rsc(_ hndlr: iDownloadHandler, _ cmd: String, _ args: [String]) t
     try hndlr.sendline("OK")
 }
 
-func iDownload_pivotRoot(_ hndlr: iDownloadHandler, _ cmd: String, _ args: [String]) throws {
-    if args.count != 2 {
-        try hndlr.sendline("Usage: pivot_root <new_fs> <old_fs>")
-        return
-    }
-    
-    let new = args[0]
-    let old = args[1]
-    let bufferNew = try KRW.alloc(size: UInt64(new.count) + 1)
-    let bufferOld = try KRW.alloc(size: UInt64(old.count) + 1)
-    
-    try KRW.kwrite(virt: bufferNew, data: new.data(using: .utf8)!)
-    try KRW.kwrite(virt: bufferOld, data: old.data(using: .utf8)!)
-    
-    let res = try KRW.kcall(func: KRW.slide(virt: 0xFFFFFFF007D0D8C0), a1: bufferNew, a2: bufferOld, a3: 0, a4: 0, a5: 0, a6: 0, a7: 0, a8: 0)
-    //let res = try KRW.kcall(func: KRW.slide(virt: 0xFFFFFFF007CE32C8), a1: bufferNew, a2: bufferOld, a3: 0, a4: 0, a5: 0, a6: 0, a7: 0, a8: 0)
-    if res != 0 {
-        try hndlr.sendline("Error: \(res) (\(String(cString: strerror(Int32(res)))))")
-    } else {
-        try hndlr.sendline("OK")
-    }
-}
-
 func iDownload_doit(_ hndlr: iDownloadHandler, _ cmd: String, _ args: [String]) throws {
-    //try iDownload_rootfs(hndlr, "rootfs", ["/dev/disk0s1s9", "/dev/disk0s1s10", "/dev/disk0s1s11", "/dev/disk0s1s12", "/dev/disk0s1s13", "/dev/disk0s1s14"])
-    try iDownload_rootfs(hndlr, "rootfs", ["/dev/disk0s1s8", "/dev/disk0s1s9", "/dev/disk0s1s10", "/dev/disk0s1s11", "/dev/disk0s1s12", "/dev/disk0s1s13"])
+    try iDownload_rootfs(hndlr, "rootfs", ["/dev/disk0s1s9", "/dev/disk0s1s10", "/dev/disk0s1s11", "/dev/disk0s1s12", "/dev/disk0s1s13", "/dev/disk0s1s14"])
+    //try iDownload_rootfs(hndlr, "rootfs", ["/dev/disk0s1s8", "/dev/disk0s1s9", "/dev/disk0s1s10", "/dev/disk0s1s11", "/dev/disk0s1s12", "/dev/disk0s1s13"])
     
     let FuFuGuGu = Bundle.main.bundleURL.appendingPathComponent("libFuFuGuGu.dylib").path
     let jbinjector = Bundle.main.bundleURL.appendingPathComponent("jbinjector.dylib").path
@@ -259,8 +156,6 @@ func iDownload_doit(_ hndlr: iDownloadHandler, _ cmd: String, _ args: [String]) 
     
     try iDownload_stashd(hndlr, "stashd", [])
     _ = try hndlr.exec("/usr/bin/inject_criticald", args: ["1", "/usr/lib/libFuFuGuGu.dylib"])
-    
-    //cleanup()
     
     let hndl = dlopen("/usr/lib/jbinjector.dylib", RTLD_NOW)
     typealias ft = @convention(c) (_: UnsafePointer<CChar>) -> Int
@@ -358,9 +253,9 @@ func iDownload_stashd(_ hndlr: iDownloadHandler, _ cmd: String, _ args: [String]
         throw e
     }
     
-    let rpl = pipe.send(message: ["action": "pacBypass2Stashd"])
+    _ = pipe.send(message: ["action": "pacBypass2Stashd"])
     
-    cleanup()
+    KRW.cleanup()
     
     try hndlr.sendline("OK")
 }
@@ -418,8 +313,7 @@ func iDownload_stealCreds(_ hndlr: iDownloadHandler, _ cmd: String, _ args: [Str
 }
 
 func iDownload_cleanup(_ hndlr: iDownloadHandler, _ cmd: String, _ args: [String]) throws {
-    cleanup()
-    pplBypassDeinit()
+    KRW.cleanup()
     try hndlr.sendline("Cleanup done, KRW is now unavailable!")
 }
 

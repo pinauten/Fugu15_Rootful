@@ -227,6 +227,64 @@ public class VMMap: KernelObject {
         
         return PMap(address: pmap)
     }
+    
+    public var links: VMMapLinks {
+        VMMapLinks(address: address + 0x10)
+    }
+}
+
+public class VMMapLinks: KernelObject {
+    public var previous: VMMapEntry? {
+        guard let previous = try? rPtr(offset: 0x00) else {
+            return nil
+        }
+        
+        guard previous != 0 else {
+            return nil
+        }
+        
+        return VMMapEntry(address: previous)
+    }
+    
+    public var next: VMMapEntry? {
+        guard let next = try? rPtr(offset: 0x08) else {
+            return nil
+        }
+        
+        guard next != 0 else {
+            return nil
+        }
+        
+        return VMMapEntry(address: next)
+    }
+    
+    public var start: UInt64? {
+        return try? r64(offset: 0x10)
+    }
+    
+    public var end: UInt64? {
+        return try? r64(offset: 0x18)
+    }
+}
+
+public class VMMapEntry: KernelObject {
+    public var links: VMMapLinks {
+        VMMapLinks(address: address + 0x00)
+    }
+    
+    public var bits: UInt64? {
+        get {
+            return try? r64(offset: 0x48)
+        }
+        
+        set {
+            guard let nv = newValue else {
+                return
+            }
+            
+            try? w64(offset: 0x48, value: nv)
+        }
+    }
 }
 
 public class PMap: KernelObject {

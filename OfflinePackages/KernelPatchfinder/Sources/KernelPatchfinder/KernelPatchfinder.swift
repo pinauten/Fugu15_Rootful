@@ -967,6 +967,28 @@ open class KernelPatchfinder {
         }
     }()
     
+    public lazy var pivot_root: UInt64? = {
+        if cachedResults != nil {
+            return cachedResults.unsafelyUnwrapped["pivot_root"]
+        }
+        
+        guard let preboot_str = cStrSect.addrOf("System/Volumes/iSCPreboot") else {
+            return nil
+        }
+        
+        guard var pc = textExec.findNextXref(to: preboot_str, optimization: .noBranches) else {
+            return nil
+        }
+        
+        while true {
+            if AArch64Instr.isPacibsp(textExec.instruction(at: pc) ?? 0, alsoAllowNop: false) {
+                return pc
+            }
+            
+            pc -= 4
+        }
+    }()
+    
     public lazy var pacda_gadget: UInt64? = {
         if cachedResults != nil {
             return cachedResults.unsafelyUnwrapped["pacda_gadget"]
@@ -1016,6 +1038,7 @@ open class KernelPatchfinder {
             "ptov_data_physBase": ptov_data?.physBase,
             "ptov_data_virtBase": ptov_data?.virtBase,
             "pmap_alloc_page_for_kern": pmap_alloc_page_for_kern,
+            "pivot_root": pivot_root,
             "pacda_gadget": pacda_gadget
         ]
         
