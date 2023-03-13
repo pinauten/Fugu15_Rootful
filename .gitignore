@@ -7,3 +7,7 @@ DerivedData/
 /Package.resolved
 
 /Fugu15.tipa
+Fugu15/Fugu15_test.tc
+jbinjector/jbinjector.dylib
+jbinjector/jbinjector_arm64.dylib
+jbinjector/jbinjector_arm64e.dylib
