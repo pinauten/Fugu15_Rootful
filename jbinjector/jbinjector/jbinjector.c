@@ -16,6 +16,7 @@
 #include <signal.h>
 #include <mach-o/loader.h>
 #include <mach-o/fat.h>
+#include <mach-o/dyld.h>
 #include <mach-o/dyld_images.h>
 #include <mach-o/nlist.h>
 //#include <Security/CSCommon.h>
@@ -26,6 +27,9 @@
 #include <dlfcn.h>
 //#include <xpc/xpc.h>
 #include <ptrauth.h>
+#include <sys/mman.h>
+
+#include "CodeSignature.h"
 
 typedef void * xpc_object_t;
 typedef xpc_object_t xpc_pipe_t;
@@ -41,6 +45,8 @@ void xpc_release(xpc_object_t);
 void xpc_dictionary_set_data(xpc_object_t, const char *, const void *, size_t);
 kern_return_t bootstrap_look_up(mach_port_t, const char *, mach_port_t *);
 
+extern const void* _dyld_get_shared_cache_range(size_t* mappedSize);
+
 xpc_pipe_t gJBDPipe = NULL;
 
 #ifdef DEBUG
@@ -52,6 +58,8 @@ xpc_pipe_t gJBDPipe = NULL;
 #define safeClose(fd) do{if ((fd) != -1){close(fd); fd = -1;}}while(0)
 #define safeFree(buf) do{if ((buf)){free(buf); buf = NULL;}}while(0)
 #define assure(cond) do {if (!(cond)){err = __LINE__; goto error;}}while(0)
+
+#define guard(cond) if (__builtin_expect(!!(cond), 1)) {}
 
 #define DYLD_INTERPOSE(_replacment,_replacee) \
 __attribute__((used)) static struct{ const void* replacment; const void* replacee; } _interpose_##_replacee \
@@ -105,86 +113,6 @@ int isBlacklisted(const char *name) {
     return 0;
 }
 
-
-#pragma mark codehashes
-
-/*
- * Magic numbers used by Code Signing
- */
-enum {
-    CSMAGIC_REQUIREMENT    = 0xfade0c00,        /* single Requirement blob */
-    CSMAGIC_REQUIREMENTS = 0xfade0c01,        /* Requirements vector (internal requirements) */
-    CSMAGIC_CODEDIRECTORY = 0xfade0c02,        /* CodeDirectory blob */
-    CSMAGIC_EMBEDDED_SIGNATURE = 0xfade0cc0, /* embedded form of signature data */
-    CSMAGIC_DETACHED_SIGNATURE = 0xfade0cc1, /* multi-arch collection of embedded signatures */
-};
-
-enum {
-    CS_PAGE_SIZE_4K                = 4096,
-    CS_PAGE_SIZE_16K               = 16384,
-
-    CS_HASHTYPE_SHA1              = 1,
-    CS_HASHTYPE_SHA256            = 2,
-    CS_HASHTYPE_SHA256_TRUNCATED  = 3,
-    CS_HASHTYPE_SHA384 = 4,
-
-    CS_HASH_SIZE_SHA1             = 20,
-    CS_HASH_SIZE_SHA256           = 32,
-    CS_HASH_SIZE_SHA256_TRUNCATED = 20,
-
-    CSSLOT_CODEDIRECTORY                 = 0,
-    CSSLOT_INFOSLOT                      = 1,
-    CSSLOT_REQUIREMENTS                  = 2,
-    CSSLOT_RESOURCEDIR                   = 3,
-    CSSLOT_APPLICATION                   = 4,
-    CSSLOT_ENTITLEMENTS                  = 5,
-    CSSLOT_ALTERNATE_CODEDIRECTORIES     = 0x1000,
-    CSSLOT_ALTERNATE_CODEDIRECTORY_MAX   = 5,
-    CSSLOT_ALTERNATE_CODEDIRECTORY_LIMIT =
-    CSSLOT_ALTERNATE_CODEDIRECTORIES + CSSLOT_ALTERNATE_CODEDIRECTORY_MAX,
-    CSSLOT_CMS_SIGNATURE                 = 0x10000,
-//    kSecCodeSignatureAdhoc      = 2
-};
-
-
-/*
- * Structure of an embedded-signature SuperBlob
- */
-typedef struct __BlobIndex {
-    uint32_t type;                  /* type of entry */
-    uint32_t offset;                /* offset of entry */
-} CS_BlobIndex;
-
-typedef struct __SuperBlob {
-    uint32_t magic;                 /* magic number */
-    uint32_t length;                /* total length of SuperBlob */
-    uint32_t count;                 /* number of index entries following */
-    CS_BlobIndex index[];           /* (count) entries */
-    /* followed by Blobs in no particular order as indicated by offsets in index */
-} CS_SuperBlob;
-
-
-/*
- * C form of a CodeDirectory.
- */
-typedef struct __CodeDirectory {
-    uint32_t magic;                 /* magic number (CSMAGIC_CODEDIRECTORY) */
-    uint32_t length;                /* total length of CodeDirectory blob */
-    uint32_t version;               /* compatibility version */
-    uint32_t flags;                 /* setup and mode flags */
-    uint32_t hashOffset;            /* offset of hash slot element at index zero */
-    uint32_t identOffset;           /* offset of identifier string */
-    uint32_t nSpecialSlots;         /* number of special hash slots */
-    uint32_t nCodeSlots;            /* number of ordinary (code) hash slots */
-    uint32_t codeLimit;             /* limit to main image signature range */
-    uint8_t  hashSize;              /* size of each hash in bytes */
-    uint8_t  hashType;              /* type of hash (cdHashType* constants) */
-    uint8_t  spare1;                /* unused (must be zero) */
-    uint8_t  pageSize;              /* log2(page size in bytes); 0 => infinite */
-    uint32_t spare2;                /* unused (must be zero) */
-    /* followed by dynamic content as located by offset fields above */
-} CS_CodeDirectory;
-
 #pragma mark lib
 int giveCSDEBUGToPid(pid_t tgtpid, int fork){
     int err = 0;
@@ -216,7 +144,7 @@ int giveCSDEBUGToPid(pid_t tgtpid, int fork){
     return err;
 }
 
-int trustCDHash(const uint8_t *hash, size_t hashSize, uint8_t hashType){
+int trustCDHash(const uint8_t *hash, size_t hashSize, uint8_t hashType) {
     int err = 0;
     if (gJBDPipe){
         xpc_object_t req = NULL;
@@ -239,111 +167,140 @@ int trustCDHash(const uint8_t *hash, size_t hashSize, uint8_t hashType){
     return err;
 }
 
-#pragma mark parsing
-int trustCDHashForCSSuperBlob(const CS_CodeDirectory *csdir){
-    int err = 0;
-    uint8_t hash[CC_SHA384_DIGEST_LENGTH] = {};
-    size_t hashSize = sizeof(hash);
-    switch (csdir->hashType) {
-        case CS_HASHTYPE_SHA1:
-            CC_SHA1(csdir, ntohl(csdir->length), hash);
-            hashSize = 20;
-            break;
-        case CS_HASHTYPE_SHA256:
-            CC_SHA256(csdir, ntohl(csdir->length), hash);
-            hashSize = 20;
-            break;
-        case CS_HASHTYPE_SHA256_TRUNCATED:
-            CC_SHA256(csdir, ntohl(csdir->length), hash);
-            hashSize = 20;
-            break;
-        case CS_HASHTYPE_SHA384:
-            CC_SHA384(csdir, ntohl(csdir->length), hash);
-            hashSize = 20;
-            break;
-        default:
-            assure(0);
-    }
-    err = trustCDHash(hash,hashSize,csdir->hashType);
-error:
-    return err;
-}
-
-/*
- * Sample code to locate the CodeDirectory from an embedded signature blob
- */
-static inline int trustCodeDirectories(const CS_SuperBlob *embedded)
-{
-    int err = 0;
-    if (embedded && ntohl(embedded->magic) == CSMAGIC_EMBEDDED_SIGNATURE) {
-        const CS_BlobIndex *limit = &embedded->index[ntohl(embedded->count)];
-        const CS_BlobIndex *p;
-        for (p = embedded->index; p < limit; ++p)
-            if (ntohl(p->type) == CSSLOT_CODEDIRECTORY /*|| (ntohl(p->type) >= CSSLOT_ALTERNATE_CODEDIRECTORIES && ntohl(p->type) < CSSLOT_ALTERNATE_CODEDIRECTORY_LIMIT)*/) {
-                const unsigned char *base = (const unsigned char *)embedded;
-                const CS_CodeDirectory *cd = (const CS_CodeDirectory *)(base + ntohl(p->offset));
-                if (ntohl(cd->magic) == CSMAGIC_CODEDIRECTORY)
-                    err |= trustCDHashForCSSuperBlob(cd);
-            }
-    }
+void fixupImages(void) {
+    size_t scSize = 0;
+    uintptr_t scBase = (uintptr_t) _dyld_get_shared_cache_range(&scSize);
+    uintptr_t scEnd  = scBase + scSize;
     
-    return err;
-}
-
-int trustCDHashesForMachHeader(struct mach_header_64 *mh){
-    struct load_command *lcmd = (struct load_command *)(mh + 1);
-    int err = 0;
-    uint8_t *codesig = NULL;
-    size_t codesigSize = 0;
-    for (uint32_t i=0; i<mh->ncmds; i++, lcmd = (struct load_command *)((uint8_t *)lcmd + lcmd->cmdsize)) {
-        if (lcmd->cmd == LC_CODE_SIGNATURE){
-            struct linkedit_data_command* cs = (struct linkedit_data_command*)lcmd;
-            codesig += (uint64_t)mh + cs->dataoff;
-            codesigSize = cs->datasize;
+    uint32_t imgCnt = _dyld_image_count();
+    for (uint32_t i = 0; i < imgCnt; i++) {
+        const struct mach_header_64 *mh = (void*) _dyld_get_image_header(i);
+        guard (mh != NULL) else {
+            continue;
         }
-    }
-    assure(codesig && codesigSize);
-    err = trustCodeDirectories((const CS_SuperBlob*)codesig);
-    //err = trustCDHashForCSSuperBlob(findCodeDirectory((const CS_SuperBlob*)codesig));
-error:
-    return err;
-}
-
-int trustCDHashesForBinary(const char *path){
-    int fd = -1;
-    uint8_t *buf = NULL;
-    //
-    int err = 0;
-    size_t bufSize = 0;
-    struct stat st = {};
-    assure((fd = open(path, O_RDONLY)) != -1);
-    assure(!fstat(fd, &st));
-    assure(buf = malloc(bufSize = st.st_size));
-    assure(read(fd, buf, bufSize) == bufSize);
-    
-    {
-        struct fat_header *ft = (struct fat_header*)buf;
-        if (ft->magic != ntohl(FAT_MAGIC)){
-            err = trustCDHashesForMachHeader((struct mach_header_64*)buf);
-        }else{
-            uint32_t narch = ntohl(ft->nfat_arch);
-            struct fat_arch *gfa = (struct fat_arch *)(ft+1);
-            for (int i=0; i<narch; i++) {
-                struct fat_arch *fa = &gfa[i];
-                struct mach_header_64 *mh = (struct mach_header_64 *)(buf+ntohl(fa->offset));
-                if (ntohl(fa->cputype) == CPU_TYPE_ARM64) {
-                    if ((err = trustCDHashesForMachHeader(mh))) goto error;
+        
+        Dl_info dlInfo;
+        guard (dladdr(mh, &dlInfo)) else {
+            // Uh-Oh!
+            continue;
+        }
+        
+        guard (dlInfo.dli_fname != NULL) else {
+            // No path?!
+            continue;
+        }
+        
+        guard ((uintptr_t) mh < scBase || (uintptr_t) mh >= scEnd) else {
+            continue;
+        }
+        
+        // Check if this needs to be fixed
+        // mh must be executable -> Fix if it isn't
+        vm_address_t addr  = (vm_address_t) mh;
+        vm_size_t regionSz = 0;
+        struct vm_region_basic_info_64 info;
+        mach_msg_type_number_t infoCnt = VM_REGION_BASIC_INFO_COUNT_64;
+        mach_port_t objectName = 0;
+        kern_return_t kr = vm_region_64(mach_task_self_, &addr, &regionSz, VM_REGION_BASIC_INFO_64, (vm_region_info_t) &info, &infoCnt, &objectName);
+        guard (kr == KERN_SUCCESS) else {
+            continue;
+        }
+        
+        if (MACH_PORT_VALID(objectName)) {
+            mach_port_deallocate(mach_task_self_, objectName);
+            objectName = 0;
+        }
+        
+        guard ((info.max_protection & VM_PROT_EXECUTE) == 0 && (info.protection & VM_PROT_EXECUTE) == 0) else {
+            // Image is ok, no need to fix it
+            continue;
+        }
+        
+        // Okay, this image has to be fixed
+        // Try to open image
+        int fd = open(dlInfo.dli_fname, O_RDONLY);
+        guard (fd >= 0) else {
+            // Oops, couldn't open dylib
+            // This *will* cause problems later on...
+            continue;
+        }
+        
+        size_t __block fatOffset = 0;
+        
+        // Attach signature
+        int ok = trustCDHashesForBinary(fd, ^int(uint8_t *hash, size_t hashSize, uint8_t hashType, size_t thisFatOffset, size_t cdHashOffset, size_t cdHashSize, struct mach_header_64 *thisMh) {
+            // Trust this CDHash
+            trustCDHash(hash, hashSize, hashType);
+            
+            guard (thisMh->cputype == mh->cputype && thisMh->cpusubtype == mh->cpusubtype) else {
+                // We're not using this slice, don't add signature
+                return 0;
+            }
+            
+            fatOffset = thisFatOffset;
+            
+            fsignatures_t siginfo;
+            siginfo.fs_file_start = thisFatOffset;
+            siginfo.fs_blob_start = (void*) cdHashOffset;
+            siginfo.fs_blob_size  = cdHashSize;
+            int err = fcntl(fd, F_ADDFILESIGS_RETURN, &siginfo);
+            guard (err != -1) else {
+                return 0;
+            }
+            
+            // Indicate success by returning one
+            // Error values are or-ed together, this way we can indicate at least one hash could be added
+            return 1;
+        });
+        
+        // Need to close fd - Otherwise mmap will fail...
+        close(fd);
+        
+        guard (ok) else {
+            // Oops, couldn't attach signature
+            // This *will* cause problems later on...
+            // XXX: Treat as completely unsigned -> munmap, vm_allocate and just copy the stuff in?
+            //      Would add a bunch of dirty memory though...
+            continue;
+        }
+        
+        // Try to open image again
+        fd = open(dlInfo.dli_fname, O_RDONLY);
+        guard (fd >= 0) else {
+            // Oops, couldn't open dylib
+            // This *will* cause problems later on...
+            // XXX: Can this ever happen?
+            continue;
+        }
+        
+        // Okay, time to go over all segments
+        // munmap everything that should be executable, then mmap again
+        uintptr_t slide = _dyld_get_image_vmaddr_slide(i);
+        uint32_t cmds = mh->ncmds;
+        struct segment_command_64 *sCmd = (struct segment_command_64*) (mh + 1);
+        for (uint32_t c = 0; c < cmds; c++) {
+            if (sCmd->cmd == LC_SEGMENT_64) {
+                if (sCmd->initprot & VM_PROT_EXECUTE) {
+                    // Remap this region
+                    uintptr_t addr = sCmd->vmaddr + slide;
+                    size_t sz      = sCmd->filesize; // Intentional
+                    size_t off     = sCmd->fileoff;
+                    int32_t prot   = sCmd->initprot;
+                    
+                    //munmap((void*) addr, sz);
+                    mmap((void*) addr, sz, prot, MAP_FIXED | MAP_PRIVATE, fd, off + fatOffset);
                 }
             }
+            
+            sCmd = (struct segment_command_64*) ((uintptr_t) sCmd + sCmd->cmdsize);
         }
+        
+        // Done!
+        close(fd);
     }
-    
-error:
-    safeFree(buf);
-    safeClose(fd);
-    return err;
 }
 
+#pragma mark parsing
 void injectDylibToEnvVars(char *const envp[], char ***outEnvp, char **freeme) {
     if (envp == NULL)
         return;
@@ -360,23 +317,23 @@ void injectDylibToEnvVars(char *const envp[], char ***outEnvp, char **freeme) {
     memset(newEnvp, 0, (envCount + 3) * sizeof(char*));
     
     for (size_t i = 0; i < envCount; i++) {
-        char *env = envp[i];
-        
         if (!key1Seen && !strncmp(envp[i], INJECT_KEY "=", sizeof(INJECT_KEY))) {
             if (strncmp(envp[i], INJECT_KEY "=" INJECT_VALUE ":", sizeof(INJECT_KEY "=" INJECT_VALUE)) && strcmp(envp[i], INJECT_KEY "=" INJECT_VALUE)) {
                 char *var = malloc(strlen(envp[i]) + sizeof(INJECT_VALUE ":"));
+                
+                #pragma clang diagnostic push
+                #pragma clang diagnostic ignored "-Wdeprecated"
                 sprintf(var, "%s=%s:%s", INJECT_KEY, INJECT_VALUE, envp[i] + sizeof(INJECT_KEY));
+                #pragma clang diagnostic pop
+                
                 freeme[0] = var;
                 newEnvp[i] = var;
                 key1Seen = true;
                 continue;
             }
         } else if (!key2Seen && !strncmp(envp[i], INJECT_KEY2 "=", sizeof(INJECT_KEY2))) {
-            if (strncmp(envp[i], INJECT_KEY2 "=" INJECT_VALUE2 ":", sizeof(INJECT_KEY2 "=" INJECT_VALUE2)) && strcmp(envp[i], INJECT_KEY2 "=" INJECT_VALUE2)) {
-                char *var = malloc(strlen(envp[i]) + sizeof(INJECT_VALUE2 ":"));
-                sprintf(var, "%s=%s:%s", INJECT_KEY2, INJECT_VALUE2, envp[i] + sizeof(INJECT_KEY2));
-                freeme[1] = var;
-                newEnvp[i] = var;
+            if (strcmp(envp[i], INJECT_KEY2 "=" INJECT_VALUE2)) {
+                newEnvp[i] = INJECT_KEY2 "=" INJECT_VALUE2;
                 key2Seen = true;
                 continue;
             }
@@ -431,47 +388,19 @@ uint64_t msyscall(uint64_t s, ...){
 int my_posix_spawn(pid_t *pid, const char *path, const posix_spawn_file_actions_t *file_actions, const posix_spawnattr_t *attrp, char *const argv[], char *const envp[]){
     int ret = 0;
     char **out = NULL;
-    char *freeme[2] = {};
+    char *freeme = NULL;
     if (gJBDPipe){
-        trustCDHashesForBinary(path);
+        trustCDHashesForBinaryPathSimple(path);
         if (!isBlacklisted(path)) {
-            injectDylibToEnvVars(envp, &out, freeme);
+            injectDylibToEnvVars(envp, &out, &freeme);
             envp = out;
         }
     }
     
-    short flags = 0;
-    int deallocAttr = 0;
-    posix_spawnattr_t tmpAttr;
-    pid_t tmpPid = 0;
-    if (!attrp) {
-        attrp = &tmpAttr;
-        posix_spawnattr_init(&tmpAttr);
-        posix_spawnattr_setflags(&tmpAttr, POSIX_SPAWN_START_SUSPENDED);
-        deallocAttr = 1;
-    } else {
-        posix_spawnattr_getflags(attrp, &flags);
-        posix_spawnattr_setflags(attrp, flags | POSIX_SPAWN_START_SUSPENDED);
-    }
-    
-    if (!pid)
-        pid = &tmpPid;
-    
     ret = posix_spawn(pid, path, file_actions, attrp, argv, envp);
-    if (ret == 0 && *pid) {
-        giveCSDEBUGToPid(*pid, 0);
-        if ((flags & POSIX_SPAWN_START_SUSPENDED) == 0)
-            kill(*pid, SIGCONT);
-    }
-    
-    if (deallocAttr)
-        posix_spawnattr_destroy(&tmpAttr);
-    else
-        posix_spawnattr_setflags(attrp, flags);
 error:
     safeFree(out);
-    safeFree(freeme[0]);
-    safeFree(freeme[1]);
+    safeFree(freeme);
     return ret;
 }
 DYLD_INTERPOSE(my_posix_spawn, posix_spawn);
@@ -479,47 +408,19 @@ DYLD_INTERPOSE(my_posix_spawn, posix_spawn);
 int my_posix_spawnp(pid_t *pid, const char *path, const posix_spawn_file_actions_t *file_actions, const posix_spawnattr_t *attrp, char *const argv[], char *const envp[]){
     int ret = 0;
     char **out = NULL;
-    char *freeme[2] = {};
+    char *freeme = NULL;
     if (gJBDPipe){
-        trustCDHashesForBinary(path);
+        trustCDHashesForBinaryPathSimple(path);
         if (!isBlacklisted(path)) {
-            injectDylibToEnvVars(envp, &out, freeme);
+            injectDylibToEnvVars(envp, &out, &freeme);
             envp = out;
         }
     }
     
-    short flags = 0;
-    int deallocAttr = 0;
-    posix_spawnattr_t tmpAttr;
-    pid_t tmpPid = 0;
-    if (!attrp) {
-        attrp = &tmpAttr;
-        posix_spawnattr_init(&tmpAttr);
-        posix_spawnattr_setflags(&tmpAttr, POSIX_SPAWN_START_SUSPENDED);
-        deallocAttr = 1;
-    } else {
-        posix_spawnattr_getflags(attrp, &flags);
-        posix_spawnattr_setflags(attrp, flags | POSIX_SPAWN_START_SUSPENDED);
-    }
-    
-    if (!pid)
-        pid = &tmpPid;
-    
     ret = posix_spawnp(pid, path, file_actions, attrp, argv, envp);
-    if (ret == 0 && *pid) {
-        giveCSDEBUGToPid(*pid, 0);
-        if ((flags & POSIX_SPAWN_START_SUSPENDED) == 0)
-            kill(*pid, SIGCONT);
-    }
-    
-    if (deallocAttr)
-        posix_spawnattr_destroy(&tmpAttr);
-    else
-        posix_spawnattr_setflags(attrp, flags);
 error:
     safeFree(out);
-    safeFree(freeme[0]);
-    safeFree(freeme[1]);
+    safeFree(freeme);
     return ret;
 }
 DYLD_INTERPOSE(my_posix_spawnp, posix_spawnp);
@@ -550,10 +451,10 @@ pid_t my_fork_internal(void){
     asm(
         "mov x16, 0x2\n"
         "svc 0x80\n"
-        "mov %0, x0\n"
-        "mov %1, x1\n"
+        "mov %w0, w0\n"
+        "mov %w1, w1\n"
         : "=r"(retval), "=r"(isChild)
-        );
+        :: "x16", "x0", "x1");
 #else
     asm(
         ".intel_syntax noprefix\n"
@@ -618,8 +519,10 @@ int my_fcntl_internal(int fd, int cmd, void *arg1, void *arg2, void *arg3, void 
             assure(buf = (uint8_t*)malloc(siginfo->fs_blob_size));
             lseek(fd, (uint64_t)siginfo->fs_blob_start, SEEK_SET);
             assure(read(fd, buf, siginfo->fs_blob_size));
-            err = trustCodeDirectories((const CS_SuperBlob*)buf);
-            //err = trustCDHashForCSSuperBlob(findCodeDirectory((const CS_SuperBlob*)buf));
+            
+            err = trustCodeDirectories(NULL, (const CS_SuperBlob *) buf, siginfo->fs_file_start, ^int(uint8_t *hash, size_t hashSize, uint8_t hashType, size_t fatOffset, size_t cdOffset, size_t cdSize, struct mach_header_64 *mh) {
+                return trustCDHash(hash, hashSize, hashType);
+            });
         error:
             lseek(fd, lpos, SEEK_SET);
             safeFree(buf);
@@ -676,7 +579,7 @@ int hookAddr(void *addr, void *target){
     {
         vm_prot_t cur = 0;
         vm_prot_t max = 0;
-        assure(!(kret = vm_remap(mach_task_self_, (mach_vm_address_t*)&target_address, (sizeof(DYLD_NEEDLE)-1)+sizeof(uint64_t), 0, VM_FLAGS_ANYWHERE | VM_FLAGS_RETURN_DATA_ADDR, mach_task_self_, (mach_vm_address_t)hooktgt, false, &cur, &max, VM_INHERIT_NONE)));
+        assure(!(kret = vm_remap(mach_task_self_, (vm_address_t*)&target_address, (sizeof(DYLD_NEEDLE)-1)+sizeof(uint64_t), 0, VM_FLAGS_ANYWHERE | VM_FLAGS_RETURN_DATA_ADDR, mach_task_self_, (mach_vm_address_t)hooktgt, false, &cur, &max, VM_INHERIT_NONE)));
         assure(!(kret = vm_protect(mach_task_self_, (mach_vm_address_t)target_address, (sizeof(DYLD_NEEDLE)-1)+sizeof(uint64_t), 0, VM_PROT_READ | VM_PROT_WRITE)));
         debug("Applying hook doing write\n");
         memcpy(target_address, DYLD_PATCH, sizeof(DYLD_PATCH)-1);
@@ -843,6 +746,8 @@ __attribute__((constructor))  int constructor(){
         debug("Failed to hook FCNTL dyld\n");
         return 0;
     }
+    
+    fixupImages();
     
     /*if (hookFork()){
         debug("Failed to hook fork\n");

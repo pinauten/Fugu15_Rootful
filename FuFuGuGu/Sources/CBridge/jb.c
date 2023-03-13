@@ -472,38 +472,10 @@ int my_posix_spawn_common(pid_t *pid, const char *path, const posix_spawn_file_a
     if (strcmp(path, "/usr/libexec/xpcproxy") == 0)
         task_set_bootstrap_port(mach_task_self_, servicePort);
     
-    short flags = 0;
-    int deallocAttr = 0;
-    posix_spawnattr_t tmpAttr;
-    pid_t tmpPid = 0;
-    if (!attrp) {
-        attrp = &tmpAttr;
-        posix_spawnattr_init(&tmpAttr);
-        posix_spawnattr_setflags(&tmpAttr, POSIX_SPAWN_START_SUSPENDED);
-        deallocAttr = 1;
-    } else {
-        posix_spawnattr_getflags(attrp, &flags);
-        posix_spawnattr_setflags(attrp, flags | POSIX_SPAWN_START_SUSPENDED);
-    }
-    
-    if (!pid)
-        pid = &tmpPid;
-    
     if (is_spawnp)
         ret = posix_spawnp(pid, path, file_actions, attrp, argv, envp);
     else
         ret = posix_spawn(pid, path, file_actions, attrp, argv, envp);
-    
-    if (ret == 0) {
-        //giveCSDEBUGToPid(*pid, 0);
-        if ((flags & POSIX_SPAWN_START_SUSPENDED) == 0)
-            kill(*pid, SIGCONT);
-    }
-    
-    if (deallocAttr)
-        posix_spawnattr_destroy(&tmpAttr);
-    else
-        posix_spawnattr_setflags(attrp, flags);
     
     task_set_bootstrap_port(mach_task_self_, MACH_PORT_NULL);
 error:

@@ -159,11 +159,11 @@ func iDownload_doit(_ hndlr: iDownloadHandler, _ cmd: String, _ args: [String]) 
     
     let hndl = dlopen("/usr/lib/jbinjector.dylib", RTLD_NOW)
     typealias ft = @convention(c) (_: UnsafePointer<CChar>) -> Int
-    let f = unsafeBitCast(dlsym(hndl, "trustCDHashesForBinary"), to: ft.self)
+    let f = unsafeBitCast(dlsym(hndl, "trustCDHashesForBinaryPathSimple"), to: ft.self)
     let res = f("/usr/bin/launchctl")
     _ = f("/usr/bin/dash")
     
-    try hndlr.sendline("trustCDHashesForBinary returned \(res)")
+    try hndlr.sendline("trustCDHashesForBinaryPathSimple returned \(res)")
     
     setenv("DYLD_INSERT_LIBRARIES", "/usr/lib/jbinjector.dylib", 1)
     setenv("DYLD_AMFI_FAKE", "0xFF", 1)

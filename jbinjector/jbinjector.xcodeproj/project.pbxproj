@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		158188A429BF337300984ECC /* CodeSignature.c in Sources */ = {isa = PBXBuildFile; fileRef = 158188A229BF337300984ECC /* CodeSignature.c */; };
 		8713320C29B16D1D00CB6196 /* jbinjector.c in Sources */ = {isa = PBXBuildFile; fileRef = 8713320B29B16D1D00CB6196 /* jbinjector.c */; };
 /* End PBXBuildFile section */
 
@@ -23,6 +24,8 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		158188A229BF337300984ECC /* CodeSignature.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = CodeSignature.c; sourceTree = "<group>"; };
+		158188A329BF337300984ECC /* CodeSignature.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = CodeSignature.h; sourceTree = "<group>"; };
 		8713320829B16D1D00CB6196 /* jbinjector */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = jbinjector; sourceTree = BUILT_PRODUCTS_DIR; };
 		8713320B29B16D1D00CB6196 /* jbinjector.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = jbinjector.c; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -58,6 +61,8 @@
 			isa = PBXGroup;
 			children = (
 				8713320B29B16D1D00CB6196 /* jbinjector.c */,
+				158188A229BF337300984ECC /* CodeSignature.c */,
+				158188A329BF337300984ECC /* CodeSignature.h */,
 			);
 			path = jbinjector;
 			sourceTree = "<group>";
@@ -120,6 +125,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				8713320C29B16D1D00CB6196 /* jbinjector.c in Sources */,
+				158188A429BF337300984ECC /* CodeSignature.c in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
