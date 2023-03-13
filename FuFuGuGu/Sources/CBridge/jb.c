@@ -159,15 +159,14 @@ xpc_object_t my_xpc_dictionary_get_value(xpc_object_t dict, const char *key) {
 DYLD_INTERPOSE(my_xpc_dictionary_get_value, xpc_dictionary_get_value);
 
 void injectDylibToEnvVars(char *const envp[], char ***outEnvp, char **freeme) {
-    if (envp == NULL)
-        return;
-    
     bool key1Seen = false;
     bool key2Seen = false;
     
     size_t envCount = 0;
-    while (envp[envCount] != NULL) {
-        envCount++;
+    if (envp) {
+        while (envp[envCount] != NULL) {
+            envCount++;
+        }
     }
     
     char **newEnvp = malloc((envCount + 3) * sizeof(char*));

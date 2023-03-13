@@ -92,6 +92,8 @@ __attribute__ ((section ("__DATA,__interpose"))) = { (const void*)(unsigned long
 #define DYLD_PATCH "\x48\xB8\x48\x47\x46\x45\x44\x43\x42\x41\xFF\xE0"
 #endif
 
+#define DEBUG 1
+
 #ifdef DEBUG
 static int gLogfd = -1;
 void init_dbglog(void){
@@ -367,15 +369,14 @@ void fixupImages(void) {
 
 #pragma mark parsing
 void injectDylibToEnvVars(char *const envp[], char ***outEnvp, char **freeme) {
-    if (envp == NULL)
-        return;
-    
     bool key1Seen = false;
     bool key2Seen = false;
     
     size_t envCount = 0;
-    while (envp[envCount] != NULL) {
-        envCount++;
+    if (envp) {
+        while (envp[envCount] != NULL) {
+            envCount++;
+        }
     }
     
     char **newEnvp = malloc((envCount + 3) * sizeof(char*));
@@ -1016,6 +1017,8 @@ __attribute__((constructor))  int constructor(){
     init_dbglog();
 #endif
     
+    debug("hello");
+    
     {
         //remove injected env vars
         unsetenv(INJECT_KEY2);
@@ -1027,6 +1030,8 @@ __attribute__((constructor))  int constructor(){
         }
     }
     
+    debug("hello\n");
+    
     kern_return_t kret = 0;
     if ((kret = bootstrap_look_up(bootstrap_port, "jb-global-jbd", &gJBDPort))){
         if ((kret = host_get_special_port(mach_host_self(), HOST_LOCAL_NODE, HOST_CLOSURED_PORT, &gJBDPort))){
@@ -1037,6 +1042,8 @@ __attribute__((constructor))  int constructor(){
         }
         //task_set_bootstrap_port(mach_task_self_, MACH_PORT_NULL);
     }
+    
+    debug("Got JBD Port\n");
 
     if (!(gJBDPipe = xpc_pipe_create_from_port(gJBDPort, 0))){
 #ifndef XCODE
@@ -1044,6 +1051,8 @@ __attribute__((constructor))  int constructor(){
         return 0;
 #endif
     }
+    
+    debug("Got JBD Pipe\n");
     
     csops(getpid(), 0, &realOps, sizeof(int));
     
@@ -1054,22 +1063,32 @@ __attribute__((constructor))  int constructor(){
 #endif
     }
     
+    debug("CSDEBUG\n");
+    
     if (hookFCNTLDyld()){
         debug("Failed to hook FCNTL dyld\n");
         return 0;
     }
     
+    debug("fcntl\n");
+    
     fixupImages();
+    
+    debug("images\n");
     
     if (hookFork()){
         debug("Failed to hook fork\n");
         return 0;
     }
     
+    debug("fork\n");
+    
     if (hookExecve()){
         debug("Failed to hook execve\n");
         return 0;
     }
+    
+    debug("execve\n");
     
     debug("All done!\n");
     
