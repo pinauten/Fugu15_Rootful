@@ -167,7 +167,7 @@ int krw_kwrite_mcbc(uintptr_t kernDst, const void * _Nonnull src, size_t size) {
 }
 
 uintptr_t krw_kbase_mcbc(void) {
-    return tfp0KBase;
+    return kernel_base;
 }
 
 /*int krw_init(patchfinder_get_offset_func _Nonnull func) {
