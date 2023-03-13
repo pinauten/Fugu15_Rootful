@@ -9,7 +9,7 @@
 import Foundation
 import CBridge
 
-let KRW_URW_PERM        = UInt64(0x60000000000040)
+let KRW_URW_PERM = UInt64(0x60000000000040)
 
 let PTE_RESERVED  = UInt64(0x3)
 let PTE_REUSEABLE = UInt64(0x1)
@@ -17,7 +17,7 @@ let PTE_UNUSED    = UInt64(0x0)
 
 fileprivate func doTLBFlush() {
     usleep(70)
-    usleep(70)
+    //usleep(70)
     dmb_sy()
 }
 
@@ -107,7 +107,7 @@ public class PPLRW {
                 Data(bytes: ptr.advanced(by: pageOff), count: readCount)
             }
             
-            pa    += UInt64(readCount)
+            pa     = pa &+ UInt64(readCount)
             count -= readCount
         }
         
@@ -154,7 +154,7 @@ public class PPLRW {
                 Data(bytes: ptr.advanced(by: pageOff), count: readCount)
             }
             
-            va    += UInt64(readCount)
+            va     = va &+ UInt64(readCount)
             count -= readCount
         }
         
@@ -195,7 +195,7 @@ public class PPLRW {
                 data.copyBytes(to: ptr.advanced(by: pageOff).assumingMemoryBound(to: UInt8.self), count: writeCount)
             }
             
-            pa += UInt64(writeCount)
+            pa = pa &+ UInt64(writeCount)
             
             if (data.count - writeCount) > 0 {
                 data = data.advanced(by: writeCount)
@@ -218,7 +218,7 @@ public class PPLRW {
                 data.copyBytes(to: ptr.advanced(by: pageOff).assumingMemoryBound(to: UInt8.self), count: writeCount)
             }
             
-            va += UInt64(writeCount)
+            va = va &+ UInt64(writeCount)
             
             if (data.count - writeCount) > 0 {
                 data = data.advanced(by: writeCount)
@@ -264,7 +264,7 @@ public class PPLRW {
     
     private static func _walkPageTable(table: UInt64, virt: UInt64) throws -> UInt64 {
         let table1Off = (virt >> 36) & 0x7
-        let table1Entry = r64(phys: table + (8 * table1Off))
+        let table1Entry = r64(phys: table &+ (8 * table1Off))
         guard (table1Entry & 0x3) == 3 else {
             let ttep = read(phys: table, count: 0x4000)
             var str = ""
@@ -277,7 +277,7 @@ public class PPLRW {
         
         let table2 = table1Entry & 0xFFFFFFFFC000
         let table2Off = (virt >> 25) & 0x7FF
-        let table2Entry = r64(phys: table2 + (8 * table2Off))
+        let table2Entry = r64(phys: table2 &+ (8 * table2Off))
         switch table2Entry & 0x3 {
         case 1:
             // Easy, this is a block
@@ -287,7 +287,7 @@ public class PPLRW {
             // Another table
             let table3 = table2Entry & 0xFFFFFFFFC000
             let table3Off = (virt >> 14) & 0x7FF
-            let table3Entry = r64(phys: table3 + (8 * table3Off))
+            let table3Entry = r64(phys: table3 &+ (8 * table3Off))
             guard (table3Entry & 0x3) == 3 else {
                 throw PPLMemoryAccessError.failedToTranslate(address: virt, table: "table3", entry: table3Entry)
             }

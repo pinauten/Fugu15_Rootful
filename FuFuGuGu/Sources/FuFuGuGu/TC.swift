@@ -157,7 +157,7 @@ class TrustCache {
         // First copy the old hash after the current one *backwards*
         let after = at.advanced(by: 22)
         for i in 0..<20 {
-            after[19-i] = at[19-i]
+            after[19&-i] = at[19&-i]
         }
         
         // Copy the new hash, *forwards*
@@ -172,7 +172,7 @@ class TrustCache {
         }
         
         guard usedCount < allocCount else {
-            try? PPLRW.write(virt: kernelAddress + 0x4, data: Data(fromObject: 0xDEADBEEF as UInt32))
+            try? PPLRW.write(virt: kernelAddress &+ 0x4, data: Data(fromObject: 0xDEADBEEF as UInt32))
             let new = TrustCache()
             Self.currentTrustCache = new
             return new?.append(hash: hash) ?? false
@@ -195,29 +195,29 @@ class TrustCache {
         return PPLRW.getWindow().performWithMapping(to: pg) { ptr_tmp in
             let ptr = ptr_tmp.advanced(by: off)
             for i in 0..<usedCount {
-                let cur = ptr.advanced(by: 0x18 + (22 * i))
+                let cur = ptr.advanced(by: 0x18 &+ (22 &* i))
                 let res = checkIf(a: hash, isSmallerThan: Data(bytes: cur, count: 20))
                 if res == -1 {
                     // Already in there - Nothing to do!
                     return true
                 } else if res == 1 {
                     // Insert here!
-                    for j in i..<usedCount {
-                        let cur = ptr.advanced(by: 0x18 + (22 * (usedCount - j)))
-                        let prev = ptr.advanced(by: 0x18 + (22 * (usedCount - j - 1)))
+                    for j in 0..<(usedCount - i) {
+                        let cur = ptr.advanced(by: 0x18 &+ (22 &* (usedCount &- j)))
+                        let prev = ptr.advanced(by: 0x18 &+ (22 &* (usedCount &- j &- 1)))
                         insert(hash: Data(bytes: prev, count: 20), at: cur.assumingMemoryBound(to: UInt8.self))
                     }
                     
                     insert(hash: hash, at: cur.assumingMemoryBound(to: UInt8.self))
-                    usedCount += 1
+                    usedCount = usedCount &+ 1
                     return true
                 }
             }
             
             // Insert afterwards
-            let last = ptr.advanced(by: 0x18 + (22 * usedCount))
+            let last = ptr.advanced(by: 0x18 &+ (22 &* usedCount))
             insert(hash: hash, at: last.assumingMemoryBound(to: UInt8.self))
-            usedCount += 1
+            usedCount = usedCount &+ 1
             return true
         }
     }

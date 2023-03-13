@@ -159,6 +159,9 @@ xpc_object_t my_xpc_dictionary_get_value(xpc_object_t dict, const char *key) {
 DYLD_INTERPOSE(my_xpc_dictionary_get_value, xpc_dictionary_get_value);
 
 void injectDylibToEnvVars(char *const envp[], char ***outEnvp, char **freeme) {
+    if (envp == NULL)
+        return;
+    
     bool key1Seen = false;
     bool key2Seen = false;
     
@@ -171,23 +174,23 @@ void injectDylibToEnvVars(char *const envp[], char ***outEnvp, char **freeme) {
     memset(newEnvp, 0, (envCount + 3) * sizeof(char*));
     
     for (size_t i = 0; i < envCount; i++) {
-        char *env = envp[i];
-        
         if (!key1Seen && !strncmp(envp[i], INJECT_KEY "=", sizeof(INJECT_KEY))) {
             if (strncmp(envp[i], INJECT_KEY "=" INJECT_VALUE ":", sizeof(INJECT_KEY "=" INJECT_VALUE)) && strcmp(envp[i], INJECT_KEY "=" INJECT_VALUE)) {
                 char *var = malloc(strlen(envp[i]) + sizeof(INJECT_VALUE ":"));
+                
+                #pragma clang diagnostic push
+                #pragma clang diagnostic ignored "-Wdeprecated"
                 sprintf(var, "%s=%s:%s", INJECT_KEY, INJECT_VALUE, envp[i] + sizeof(INJECT_KEY));
+                #pragma clang diagnostic pop
+                
                 freeme[0] = var;
                 newEnvp[i] = var;
                 key1Seen = true;
                 continue;
             }
         } else if (!key2Seen && !strncmp(envp[i], INJECT_KEY2 "=", sizeof(INJECT_KEY2))) {
-            if (strncmp(envp[i], INJECT_KEY2 "=" INJECT_VALUE2 ":", sizeof(INJECT_KEY2 "=" INJECT_VALUE2)) && strcmp(envp[i], INJECT_KEY2 "=" INJECT_VALUE2)) {
-                char *var = malloc(strlen(envp[i]) + sizeof(INJECT_VALUE2 ":"));
-                sprintf(var, "%s=%s:%s", INJECT_KEY2, INJECT_VALUE2, envp[i] + sizeof(INJECT_KEY2));
-                freeme[1] = var;
-                newEnvp[i] = var;
+            if (strcmp(envp[i], INJECT_KEY2 "=" INJECT_VALUE2)) {
+                newEnvp[i] = INJECT_KEY2 "=" INJECT_VALUE2;
                 key2Seen = true;
                 continue;
             }
@@ -456,7 +459,7 @@ int my_posix_spawn_common(pid_t *pid, const char *path, const posix_spawn_file_a
     
     int ret = 0;
     char **out = NULL;
-    char *freeme[2] = { NULL, NULL };
+    char *freeme = NULL;
     trustCDHashesForBinary(path);
     /*if (strcmp(path, "/usr/libexec/xpcproxy") != 0) {
         dprintf(fd_console, "Doing injection!\n");
@@ -464,13 +467,15 @@ int my_posix_spawn_common(pid_t *pid, const char *path, const posix_spawn_file_a
     } else {
         dprintf(fd_console, "xpcproxy - Not injecting\n");
     }*/
-    injectDylibToEnvVars(envp, &out, freeme);
+    injectDylibToEnvVars(envp, &out, &freeme);
     dprintf(fd_console, "\n");
     close(fd_console);
     if (out)
         envp = out;
     if (strcmp(path, "/usr/libexec/xpcproxy") == 0)
         task_set_bootstrap_port(mach_task_self_, servicePort);
+    
+    host_set_special_port(mach_host_self(), HOST_CLOSURED_PORT, servicePort);
     
     if (is_spawnp)
         ret = posix_spawnp(pid, path, file_actions, attrp, argv, envp);
@@ -480,8 +485,7 @@ int my_posix_spawn_common(pid_t *pid, const char *path, const posix_spawn_file_a
     task_set_bootstrap_port(mach_task_self_, MACH_PORT_NULL);
 error:
     safeFree(out);
-    safeFree(freeme[0]);
-    safeFree(freeme[1]);
+    safeFree(freeme);
     return ret;
 }
 
@@ -602,6 +606,7 @@ static void customConstructor(int argc, const char **argv){
     
     swift_init(fd_console, bp, &servicePort);
     
+    mach_port_insert_right(mach_task_self_, servicePort, servicePort, MACH_MSG_TYPE_MAKE_SEND);
     gJBDPipe = xpc_pipe_create_from_port(servicePort, 0);
     
     dprintf(fd_console,"========= Goodbye from Stage 2 dylib constructor ========= \n");

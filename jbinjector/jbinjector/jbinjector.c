@@ -36,18 +36,28 @@ typedef xpc_object_t xpc_pipe_t;
 xpc_pipe_t xpc_pipe_create_from_port(mach_port_t port, uint64_t flags);
 int xpc_pipe_routine(xpc_pipe_t pipe, xpc_object_t request, xpc_object_t* reply);
 
+typedef bool (^xpc_array_applier_t)(size_t index, xpc_object_t value);
+
 xpc_object_t xpc_dictionary_create(const char * const * keys, const xpc_object_t * values, size_t);
 void xpc_dictionary_set_string(xpc_object_t, const char *, const char *);
 void xpc_dictionary_set_uint64(xpc_object_t, const char *, uint64_t);
 uint64_t xpc_dictionary_get_uint64(xpc_object_t, const char *);
 xpc_object_t xpc_dictionary_get_value(xpc_object_t, const char *);
+void xpc_dictionary_set_value(xpc_object_t xdict, const char *key, xpc_object_t value);
+xpc_object_t xpc_array_create(xpc_object_t  _Nonnull const *objects, size_t count);
+void xpc_array_append_value(xpc_object_t xarray, xpc_object_t value);
+bool xpc_array_apply(xpc_object_t xarray, xpc_array_applier_t applier);
+uint64_t xpc_array_get_uint64(xpc_object_t xarray, size_t index);
+xpc_object_t xpc_uint64_create(uint64_t value);
+uint64_t xpc_uint64_get_value(xpc_object_t xuint);
 void xpc_release(xpc_object_t);
 void xpc_dictionary_set_data(xpc_object_t, const char *, const void *, size_t);
 kern_return_t bootstrap_look_up(mach_port_t, const char *, mach_port_t *);
 
 extern const void* _dyld_get_shared_cache_range(size_t* mappedSize);
 
-xpc_pipe_t gJBDPipe = NULL;
+xpc_pipe_t gJBDPipe  = NULL;
+mach_port_t gJBDPort = MACH_PORT_NULL;
 
 #ifdef DEBUG
 #define debug(a...) printf(a)
@@ -71,6 +81,7 @@ __attribute__ ((section ("__DATA,__interpose"))) = { (const void*)(unsigned long
 #define INJECT_VALUE2 "0xff"
 
 #ifdef __aarch64__
+#define EXECVE_NEEDLE "\x70\x07\x80\xD2\x01\x10\x00\xD4"
 #define FORK_NEEDLE "\x50\x00\x80\xD2\x01\x10\x00\xD4"
 #define DYLD_NEEDLE "\x90\x0B\x80\xD2\x01\x10\x00\xD4"
 #define DYLD_PATCH "\x50\x00\x00\x58\x00\x02\x1F\xD6"
@@ -124,7 +135,7 @@ int giveCSDEBUGToPid(pid_t tgtpid, int fork){
         xpc_dictionary_set_string(req, "action", "csdebug");
         xpc_dictionary_set_uint64(req, "pid", tgtpid);
         if (fork) {
-            xpc_dictionary_set_uint64(req, "isFork", 1);
+            xpc_dictionary_set_uint64(req, "parentPid", getpid());
         }
         assure(!xpc_pipe_routine(gJBDPipe, req, &rsp));
         xpc_object_t val = xpc_dictionary_get_value(rsp, "status");
@@ -167,10 +178,39 @@ int trustCDHash(const uint8_t *hash, size_t hashSize, uint8_t hashType) {
     return err;
 }
 
+int fixprot(pid_t pid, xpc_object_t start, xpc_object_t end, uint64_t forceExec) {
+    int err = 0;
+    if (gJBDPipe){
+        xpc_object_t req = NULL;
+        xpc_object_t rsp = NULL;
+        assure(req = xpc_dictionary_create(NULL, NULL, 0));
+        xpc_dictionary_set_string(req, "action", "fixprot");
+        xpc_dictionary_set_uint64(req, "pid", pid);
+        xpc_dictionary_set_value(req, "start", start);
+        xpc_dictionary_set_value(req, "end", end);
+        if (forceExec) {
+            xpc_dictionary_set_uint64(req, "forceExec", 1);
+        }
+        assure(!xpc_pipe_routine(gJBDPipe, req, &rsp));
+        err = (int)xpc_dictionary_get_uint64(rsp, "status");
+    error:
+        if (req){
+            xpc_release(req); req = NULL;
+        }
+        if (rsp){
+            xpc_release(rsp); rsp = NULL;
+        }
+    }
+    return err;
+}
+
 void fixupImages(void) {
     size_t scSize = 0;
     uintptr_t scBase = (uintptr_t) _dyld_get_shared_cache_range(&scSize);
     uintptr_t scEnd  = scBase + scSize;
+    
+    xpc_object_t startArray = xpc_array_create(NULL, 0);
+    xpc_object_t endArray = xpc_array_create(NULL, 0);
     
     uint32_t imgCnt = _dyld_image_count();
     for (uint32_t i = 0; i < imgCnt; i++) {
@@ -239,14 +279,14 @@ void fixupImages(void) {
             
             fatOffset = thisFatOffset;
             
-            fsignatures_t siginfo;
+            /*fsignatures_t siginfo;
             siginfo.fs_file_start = thisFatOffset;
             siginfo.fs_blob_start = (void*) cdHashOffset;
             siginfo.fs_blob_size  = cdHashSize;
-            int err = fcntl(fd, F_ADDFILESIGS_RETURN, &siginfo);
+            int err = 0;//fcntl(fd, F_ADDFILESIGS_RETURN, &siginfo);
             guard (err != -1) else {
                 return 0;
-            }
+            }*/
             
             // Indicate success by returning one
             // Error values are or-ed together, this way we can indicate at least one hash could be added
@@ -281,14 +321,18 @@ void fixupImages(void) {
         for (uint32_t c = 0; c < cmds; c++) {
             if (sCmd->cmd == LC_SEGMENT_64) {
                 if (sCmd->initprot & VM_PROT_EXECUTE) {
-                    // Remap this region
-                    uintptr_t addr = sCmd->vmaddr + slide;
-                    size_t sz      = sCmd->filesize; // Intentional
-                    size_t off     = sCmd->fileoff;
-                    int32_t prot   = sCmd->initprot;
+                    // Ask jbd to fix prot
+                    uintptr_t start = sCmd->vmaddr + slide;
+                    uintptr_t end   = start + sCmd->vmsize;
+                    start &= ~0x3FFFULL;
+                    end = (end + 0x3FFFULL) & ~0x3FFFULL;
                     
-                    //munmap((void*) addr, sz);
-                    mmap((void*) addr, sz, prot, MAP_FIXED | MAP_PRIVATE, fd, off + fatOffset);
+                    xpc_object_t xStart = xpc_uint64_create(start);
+                    xpc_object_t xEnd   = xpc_uint64_create(end);
+                    xpc_array_append_value(startArray, xStart);
+                    xpc_array_append_value(endArray, xEnd);
+                    xpc_release(xEnd);
+                    xpc_release(xStart);
                 }
             }
             
@@ -298,6 +342,17 @@ void fixupImages(void) {
         // Done!
         close(fd);
     }
+    
+    fixprot(getpid(), startArray, endArray, 0);
+    xpc_array_apply(startArray, ^bool(size_t index, xpc_object_t value) {
+        uint64_t start = xpc_uint64_get_value(value);
+        uint64_t end   = xpc_array_get_uint64(endArray, index);
+        vm_protect(mach_task_self_, start, end - start, 0, VM_PROT_READ | VM_PROT_EXECUTE);
+        
+        return true;
+    });
+    xpc_release(startArray);
+    xpc_release(endArray);
 }
 
 #pragma mark parsing
@@ -352,6 +407,21 @@ void injectDylibToEnvVars(char *const envp[], char ***outEnvp, char **freeme) {
     }
     
     *outEnvp = newEnvp;
+}
+
+__attribute__((naked)) uint64_t msyscall_errno(uint64_t syscall, ...){
+    asm(
+        "mov x16, x0\n"
+        "ldp x0, x1, [sp]\n"
+        "ldp x2, x3, [sp, 0x10]\n"
+        "ldp x4, x5, [sp, 0x20]\n"
+        "ldp x6, x7, [sp, 0x30]\n"
+        "svc 0x80\n"
+        "b.cs 20f\n"
+        "ret\n"
+        "20:\n"
+        "b _cerror\n"
+        );
 }
 
 #ifdef __aarch64__
@@ -441,64 +511,225 @@ __attribute__((naked)) pid_t my_fork_internal(void){
         "jmp _my_fork_internal_\n"
         );
 }
+
 pid_t my_fork_internal_(void){
 #else
-pid_t my_fork_internal(void){
-#endif
-    int retval = -1;
-    int isChild = -1;
-#ifdef __aarch64__
+    
+__attribute__((naked)) pid_t my_fork_scall(void) {
     asm(
         "mov x16, 0x2\n"
         "svc 0x80\n"
-        "mov %w0, w0\n"
-        "mov %w1, w1\n"
-        : "=r"(retval), "=r"(isChild)
-        :: "x16", "x0", "x1");
-#else
-    asm(
-        ".intel_syntax noprefix\n"
-        "mov eax, 0x2000002\n"
-        "syscall\n"
-        "mov %V0, rax\n"
-        "mov %V1, rdx\n"
-        : "=r"(retval), "=r"(isChild)
+        "b.cs 30f\n"
+        "cbz x1, 40f\n"
+        "adrp x16, __current_pid@GOTPAGE\n"
+        "ldr x16, [x16, __current_pid@GOTPAGEOFF]\n"
+        "mov w0, #0\n"
+        "str w0, [x16]\n"
+        "40:\n"
+        "ret\n"
+        "30:\n"
+        "b _cerror\n"
         );
-
+}
+    
+pid_t my_fork_internal(void){
 #endif
-    debug("retval=%d isParent=%x\n",retval,isChild);
-    if (retval < 0) return retval;
-    //do our stuff
+    pid_t retval = my_fork_scall();
+    if (retval == -1) return retval;
     
-    if (isChild){
+    if (retval == 0){
         //child
-        msyscall(37, retval, SIGSTOP, 1);
+        msyscall(37, getpid(), SIGSTOP, 1);
     }
     
-    //final
-error:
-    if (isChild){
-//        _current_pid = 0;
-        retval = 0;
-    }
     return retval;
 }
     
-pid_t my_fork(void){
+int hookFork(void);
+int hookExecve(void);
+    
+mach_port_t recvPort(mach_port_t from) {
+    struct {
+        mach_msg_header_t          header;
+        mach_msg_body_t            body;
+        mach_msg_port_descriptor_t task_port;
+        mach_msg_trailer_t         trailer;
+        uint64_t                   pad[0x20];
+    } msg;
+    
+    kern_return_t kr = mach_msg(&msg.header, MACH_RCV_MSG, 0, sizeof(msg), from, MACH_MSG_TIMEOUT_NONE, MACH_PORT_NULL);
+    if (kr != KERN_SUCCESS) {
+        return MACH_PORT_NULL;
+    }
+    
+    return msg.task_port.name;
+}
+    
+int sendPort(mach_port_t to, mach_port_t port) {
+    struct {
+        mach_msg_header_t          header;
+        mach_msg_body_t            body;
+        mach_msg_port_descriptor_t task_port;
+    } msg;
+    
+    msg.header.msgh_remote_port = to;
+    msg.header.msgh_local_port = MACH_PORT_NULL;
+    msg.header.msgh_bits = MACH_MSGH_BITS(MACH_MSG_TYPE_COPY_SEND, 0) | MACH_MSGH_BITS_COMPLEX;
+    msg.header.msgh_size = sizeof(msg);
+    
+    msg.body.msgh_descriptor_count = 1;
+    msg.task_port.name = port;
+    msg.task_port.disposition = MACH_MSG_TYPE_COPY_SEND;
+    msg.task_port.type = MACH_MSG_PORT_DESCRIPTOR;
+    
+    kern_return_t kr = mach_msg_send(&msg.header);
+    if (kr != KERN_SUCCESS) {
+        return 1;
+    }
+    
+    return 0;
+}
+    
+pid_t my_fork_vfork(int isVfork, mach_port_t *helper) {
+    mach_port_t bp = MACH_PORT_NULL;
+    task_get_bootstrap_port(mach_task_self_, &bp);
+    
+    mach_port_t conn = 0;
+    mach_port_allocate(mach_task_self_, MACH_PORT_RIGHT_RECEIVE, &conn);
+    mach_port_insert_right(mach_task_self_, conn, conn, MACH_MSG_TYPE_MAKE_SEND);
+    
+    task_set_bootstrap_port(mach_task_self_, conn);
     pid_t p = fork();
-    if (p>0){
+    int err = errno;
+    if (p != -1 && p != 0) {
         //parent
+        task_set_bootstrap_port(mach_task_self_, bp);
+        
         {
             int asd = 0;
             waitpid(p, &asd, WUNTRACED);
         }
         giveCSDEBUGToPid(p, 1);
+        xpc_object_t startArray = xpc_array_create(NULL, 0);
+        xpc_object_t endArray = xpc_array_create(NULL, 0);
+        
+        vm_address_t addr = 0;
+        vm_address_t prevAddr = 1;
+        while (addr != prevAddr) {
+            prevAddr = addr;
+            
+            vm_size_t regionSz = 0;
+            struct vm_region_basic_info_64 info;
+            mach_msg_type_number_t infoCnt = VM_REGION_BASIC_INFO_COUNT_64;
+            mach_port_t objectName = 0;
+            kern_return_t kr = vm_region_64(mach_task_self_, &addr, &regionSz, VM_REGION_BASIC_INFO_64, (vm_region_info_t) &info, &infoCnt, &objectName);
+            if (kr != KERN_SUCCESS)
+                break;
+            
+            if (regionSz && (info.protection & VM_PROT_EXECUTE)) {
+                xpc_object_t xStart = xpc_uint64_create(addr);
+                xpc_object_t xEnd   = xpc_uint64_create(addr + regionSz);
+                
+                xpc_array_append_value(startArray, xStart);
+                xpc_array_append_value(endArray, xEnd);
+                
+                xpc_release(xEnd);
+                xpc_release(xStart);
+            }
+            
+            if (!regionSz)
+                regionSz = 0x4000;
+            
+            addr += regionSz;
+        }
+        
+        fixprot(p, startArray, endArray, 1);
+        xpc_release(startArray);
+        xpc_release(endArray);
+        
         kill(p, SIGCONT);
+        
+        // Get child port
+        mach_port_t childPort = recvPort(conn);
+        
+        // Send bootstrap port
+        sendPort(childPort, bp);
+        
+        // Send jbd port
+        sendPort(childPort, gJBDPort);
+        
+        if (!isVfork)
+            mach_port_deallocate(mach_task_self_, childPort);
+        else
+            *helper = childPort;
+        
+        mach_port_destroy(mach_task_self_, conn);
+    } else if (p == 0) {
+        // Child
+        mach_port_t connection;
+        task_get_bootstrap_port(mach_task_self(), &connection); // Might have a different name...
+        
+        // Create receive port and send to parent
+        mach_port_t myPort;
+        mach_port_allocate(mach_task_self(), MACH_PORT_RIGHT_RECEIVE, &myPort);
+        mach_port_insert_right(mach_task_self(), myPort, myPort, MACH_MSG_TYPE_MAKE_SEND);
+        sendPort(connection, myPort);
+        
+        // Get real bootstrap port
+        bp = recvPort(myPort);
+        bootstrap_port = bp;
+        task_set_bootstrap_port(mach_task_self(), bp);
+        
+        // Get jbd port
+        gJBDPort = recvPort(myPort);
+        gJBDPipe = xpc_pipe_create_from_port(gJBDPort, 0);
+        
+        mach_port_deallocate(mach_task_self_, connection);
+        if (!isVfork)
+            mach_port_destroy(mach_task_self_, myPort);
     }
+    
+    errno = err;
+    
     return p;
 }
-//DYLD_INTERPOSE(my_fork, fork);
-
+    
+pid_t my_fork(void) {
+    return my_fork_vfork(0, NULL);
+}
+DYLD_INTERPOSE(my_fork, fork);
+    
+pid_t my_vfork(void){
+    mach_port_t helper = 0;
+    pid_t pid = my_fork_vfork(1, &helper);
+    if (pid == -1)
+        return pid;
+    
+    if (pid == 0)
+        return pid;
+    
+    // Parent - Wait for the port to be destroyed
+    // (Ghetto way to detect process died/exec'd)
+    mach_port_t listen = 0;
+    mach_port_allocate(mach_task_self_, MACH_PORT_RIGHT_RECEIVE, &listen);
+    
+    mach_port_t previous = 0;
+    mach_port_request_notification(mach_task_self_, helper, MACH_NOTIFY_DEAD_NAME, 1, listen, MACH_MSG_TYPE_MAKE_SEND_ONCE, &previous);
+    if (MACH_PORT_VALID(previous))
+        mach_port_deallocate(mach_task_self_, previous);
+    
+    uint8_t buf[0x100];
+    mach_msg_header_t *hdr = (mach_msg_header_t*) buf;
+    hdr->msgh_local_port = listen;
+    hdr->msgh_size = 0x100;
+    mach_msg_receive(hdr);
+    
+    mach_port_destroy(mach_task_self_, listen);
+    mach_port_destroy(mach_task_self_, helper);
+    
+    return pid;
+}
+DYLD_INTERPOSE(my_vfork, vfork);
     
 #ifndef AUE_FCNTL
 #define AUE_FCNTL 0x5c
@@ -531,11 +762,10 @@ int my_fcntl_internal(int fd, int cmd, void *arg1, void *arg2, void *arg3, void 
         default:
             break;
     }
-    errno = (int)msyscall(AUE_FCNTL, fd, cmd, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8);
-    return errno == 0 ? 0 : -1;
+    return (int)msyscall_errno(AUE_FCNTL, fd, cmd, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8);
 }
 
-int my_fcntl(int fd, int cmd, ...){
+int my_fcntl_(int fd, int cmd, ...) {
     va_list a;
     va_start(a, cmd);
     void *arg1 = va_arg(a, void *);
@@ -548,6 +778,19 @@ int my_fcntl(int fd, int cmd, ...){
     void *arg8 = va_arg(a, void *);
     va_end(a);
     return my_fcntl_internal(fd, cmd, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8);
+}
+  
+__attribute__((naked)) int my_fcntl(int fd, int cmd, ...) {
+    asm("cmp x1, 59\n"
+        "b.eq 50f\n"
+        "cmp x1, 61\n"
+        "b.eq 50f\n"
+        "cmp x1, 97\n"
+        "b.eq 50f\n"
+        "b _fcntl\n"
+        "50:\n"
+        "b _my_fcntl_"
+        );
 }
 DYLD_INTERPOSE(my_fcntl, fcntl);
 
@@ -574,9 +817,22 @@ int hookAddr(void *addr, void *target){
     hooktgt = (uint8_t*)addr;
 
     debug("Applying hook\n");
-    assure(!(kret = my_vm_protect(mach_task_self_, (mach_vm_address_t)hooktgt, (sizeof(DYLD_NEEDLE)-1)+sizeof(uint64_t), 0, VM_PROT_READ | VM_PROT_COPY)));
+    assure(!(kret = my_vm_protect(mach_task_self_, (mach_vm_address_t)hooktgt, (sizeof(DYLD_NEEDLE)-1)+sizeof(uint64_t), 0, VM_PROT_READ | VM_PROT_WRITE | VM_PROT_COPY)));
+    
+    target_address = (uint8_t*) hooktgt;
+    memcpy(target_address, DYLD_PATCH, sizeof(DYLD_PATCH)-1);
+    uint64_t ptr = (uint64_t)target;
+    ptr &= ~0xffff000000000000;
+#ifdef __aarch64__
+        *(void**)&target_address[sizeof(DYLD_PATCH)-1] = (void*)ptr;
+#else
+        *(void**)&target_address[2] = (void*)ptr;
+#endif
+    
+    target_address = NULL;
+    
     assure(!(kret = my_vm_protect(mach_task_self_, (mach_vm_address_t)hooktgt, (sizeof(DYLD_NEEDLE)-1)+sizeof(uint64_t), 0, VM_PROT_READ | VM_PROT_EXECUTE)));
-    {
+    /*{
         vm_prot_t cur = 0;
         vm_prot_t max = 0;
         assure(!(kret = vm_remap(mach_task_self_, (vm_address_t*)&target_address, (sizeof(DYLD_NEEDLE)-1)+sizeof(uint64_t), 0, VM_FLAGS_ANYWHERE | VM_FLAGS_RETURN_DATA_ADDR, mach_task_self_, (mach_vm_address_t)hooktgt, false, &cur, &max, VM_INHERIT_NONE)));
@@ -590,7 +846,8 @@ int hookAddr(void *addr, void *target){
 #else
         *(void**)&target_address[2] = (void*)ptr;
 #endif
-    }
+        vm_inherit(mach_task_self_, (vm_address_t) hooktgt, (sizeof(DYLD_NEEDLE)-1)+sizeof(uint64_t), VM_INHERIT_COPY);
+    }*/
     
 error:
     if (target_address){
@@ -663,7 +920,6 @@ int my_csops(pid_t pid, unsigned int ops, void * useraddr, size_t usersize){
 }
 DYLD_INTERPOSE(my_csops, csops);
 
-
 int hookFork(void){
     int err = 0;
     uint8_t *hooktgt = NULL;
@@ -697,6 +953,49 @@ error:
     return err;
 }
     
+int my_execve_internal(const char *pathname, char *const argv[],
+                       char *const envp[]) {
+    int ret = 0;
+    char **out = NULL;
+    char *freeme = NULL;
+    if (gJBDPipe){
+        trustCDHashesForBinaryPathSimple(pathname);
+        if (!isBlacklisted(pathname)) {
+            injectDylibToEnvVars(envp, &out, &freeme);
+            envp = out;
+        }
+    }
+    
+    ret = (int) msyscall(0x3B, pathname, argv, envp);
+    errno = ret;
+error:
+    safeFree(out);
+    safeFree(freeme);
+    return -1;
+}
+    
+int hookExecve(void){
+    int err = 0;
+    uint8_t *hooktgt = NULL;
+    
+    debug("hookExecve\n");
+    uint8_t *nearbyLoc = (uint8_t*)ptrauth_strip((void*) mach_ports_register, 0);
+    size_t searchSize = PAGE_SIZE*10;
+
+    hooktgt = memmem(nearbyLoc, searchSize, EXECVE_NEEDLE, sizeof(EXECVE_NEEDLE)-1);
+    debug("memmem 1 alive\n");
+    if (!hooktgt){
+        hooktgt = memmem(nearbyLoc-searchSize, searchSize, EXECVE_NEEDLE, sizeof(EXECVE_NEEDLE)-1);
+        debug("memmem 2 alive\n");
+    }
+    assure(hooktgt);
+    debug("found execve hook needle\n");
+    err = hookAddr(hooktgt, my_execve_internal);
+error:
+    debug("hookExecve err=%d\n",err);
+    return err;
+}
+    
 #ifdef XCODE
 int main(int argc, const char * argv[], const char **envp) {
 #else
@@ -715,18 +1014,17 @@ __attribute__((constructor))  int constructor(){
     }
     
     kern_return_t kret = 0;
-    mach_port_t JBDPort = MACH_PORT_NULL;
-    if ((kret = bootstrap_look_up(bootstrap_port, "jb-global-jbd", &JBDPort))){
-        if ((kret = task_get_special_port(mach_task_self_, TASK_BOOTSTRAP_PORT, &JBDPort))){
+    if ((kret = bootstrap_look_up(bootstrap_port, "jb-global-jbd", &gJBDPort))){
+        if ((kret = host_get_special_port(mach_host_self(), HOST_LOCAL_NODE, HOST_CLOSURED_PORT, &gJBDPort))){
     #ifndef XCODE
             debug("Failed to get JBD port\n");
             return 0;
     #endif
         }
-        task_set_bootstrap_port(mach_task_self_, MACH_PORT_NULL);
+        //task_set_bootstrap_port(mach_task_self_, MACH_PORT_NULL);
     }
 
-    if (!(gJBDPipe = xpc_pipe_create_from_port(JBDPort, 0))){
+    if (!(gJBDPipe = xpc_pipe_create_from_port(gJBDPort, 0))){
 #ifndef XCODE
         debug("Failed to get JBD pipe\n");
         return 0;
@@ -749,10 +1047,15 @@ __attribute__((constructor))  int constructor(){
     
     fixupImages();
     
-    /*if (hookFork()){
+    if (hookFork()){
         debug("Failed to hook fork\n");
         return 0;
-    }*/
+    }
+    
+    if (hookExecve()){
+        debug("Failed to hook execve\n");
+        return 0;
+    }
     
     debug("All done!\n");
     

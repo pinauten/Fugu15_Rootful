@@ -16,35 +16,35 @@ public class KernelObject {
     }
     
     public func rPtr(offset: UInt64) throws -> UInt64 {
-        try KRW.rPtr(virt: self.address + offset)
+        try KRW.rPtr(virt: self.address &+ offset)
     }
     
     public func r64(offset: UInt64) throws -> UInt64 {
-        try KRW.r64(virt: self.address + offset)
+        try KRW.r64(virt: self.address &+ offset)
     }
     
     public func r32(offset: UInt64) throws -> UInt32 {
-        try KRW.r32(virt: self.address + offset)
+        try KRW.r32(virt: self.address &+ offset)
     }
     
     public func r16(offset: UInt64) throws -> UInt16 {
-        try KRW.r16(virt: self.address + offset)
+        try KRW.r16(virt: self.address &+ offset)
     }
     
     public func r8(offset: UInt64) throws -> UInt8 {
-        try KRW.r8(virt: self.address + offset)
+        try KRW.r8(virt: self.address &+ offset)
     }
     
     public func w64(offset: UInt64, value: UInt64) throws {
-        try KRW.w64(virt: self.address + offset, value: value)
+        try KRW.w64(virt: self.address &+ offset, value: value)
     }
     
     public func w64PPL(offset: UInt64, value: UInt64) throws {
-        try KRW.pplwrite(virt: self.address + offset, data: Data(fromObject: value))
+        try KRW.pplwrite(virt: self.address &+ offset, data: Data(fromObject: value))
     }
     
     public func w32PPL(offset: UInt64, value: UInt32) throws {
-        try KRW.pplwrite(virt: self.address + offset, data: Data(fromObject: value))
+        try KRW.pplwrite(virt: self.address &+ offset, data: Data(fromObject: value))
     }
 }
 
@@ -56,7 +56,7 @@ public class Proc: KernelObject {
         
         var curProc = try KRW.slide(virt: allproc)
         while curProc != 0 {
-            if try KRW.r32(virt: curProc + 0x68 /* PROC_PID */) == pid {
+            if try KRW.r32(virt: curProc &+ 0x68 /* PROC_PID */) == pid {
                 self.init(address: curProc)
                 return
             }
@@ -80,7 +80,7 @@ public class Proc: KernelObject {
             try? r32(offset: 0x0)
         }
         set {
-            try? KRW.w32(virt: address + 0x0, value: newValue ?? 0)
+            try? KRW.w32(virt: address &+ 0x0, value: newValue ?? 0)
         }
     }
     
@@ -267,7 +267,7 @@ public class VMMap: KernelObject {
     }
     
     public var links: VMMapLinks {
-        VMMapLinks(address: address + 0x10)
+        VMMapLinks(address: address &+ 0x10)
     }
 }
 
@@ -305,14 +305,58 @@ public class VMMapLinks: KernelObject {
     }
 }
 
-public class VMMapEntry: KernelObject {
-    public var links: VMMapLinks {
-        VMMapLinks(address: address + 0x00)
+fileprivate func sp(_ ptr: UInt64) -> UInt64 {
+    if ((ptr >> 55) & 1) == 1 {
+        return ptr | 0xFFFFFF8000000000
+    }
+    
+    return ptr
+}
+
+public class VMMapEntry {
+    public let address: UInt64
+    public let data: Data
+    
+    init(address: UInt64) {
+        self.address = address
+        self.data    = try! KRW.kread(virt: address, size: 0x58)
+    }
+    
+    public var previous: VMMapEntry? {
+        guard let previous = data.tryGetGeneric(type: UInt64.self, offset: 0x00) else {
+            return nil
+        }
+        
+        guard previous != 0 else {
+            return nil
+        }
+        
+        return VMMapEntry(address: sp(previous))
+    }
+    
+    public var next: VMMapEntry? {
+        guard let next = data.tryGetGeneric(type: UInt64.self, offset: 0x08) else {
+            return nil
+        }
+        
+        guard next != 0 else {
+            return nil
+        }
+        
+        return VMMapEntry(address: sp(next))
+    }
+    
+    public var start: UInt64? {
+        return data.tryGetGeneric(type: UInt64.self, offset: 0x10)
+    }
+    
+    public var end: UInt64? {
+        return data.tryGetGeneric(type: UInt64.self, offset: 0x18)
     }
     
     public var bits: UInt64? {
         get {
-            return try? r64(offset: 0x48)
+            return data.tryGetGeneric(type: UInt64.self, offset: 0x48)
         }
         
         set {
@@ -320,7 +364,7 @@ public class VMMapEntry: KernelObject {
                 return
             }
             
-            try? w64(offset: 0x48, value: nv)
+            try? KRW.w64(virt: address &+ 0x48, value: nv)
         }
     }
 }
@@ -330,7 +374,7 @@ public class PMap: KernelObject {
         get {
             let adjust: UInt64 = (KRW.patchfinder.kernel_el == 2) ? 8 : 0
             
-            return try? r8(offset: 0xC8 + adjust)
+            return try? r8(offset: 0xC8 &+ adjust)
         }
         
         set {
@@ -340,7 +384,7 @@ public class PMap: KernelObject {
             
             let adjust: UInt64 = (KRW.patchfinder.kernel_el == 2) ? 8 : 0
             
-            try? KRW.pplwrite(virt: self.address + 0xC8 + adjust, data: Data(fromObject: newValue.unsafelyUnwrapped))
+            try? KRW.pplwrite(virt: self.address &+ 0xC8 &+ adjust, data: Data(fromObject: newValue.unsafelyUnwrapped))
         }
     }
     
@@ -353,7 +397,7 @@ public class PMap: KernelObject {
             
             let adjust: UInt64 = (KRW.patchfinder.kernel_el == 2) ? 8 : 0
             
-            return try? r8(offset: ALLOW_WX + adjust)
+            return try? r8(offset: ALLOW_WX &+ adjust)
         }
         
         set {
@@ -372,8 +416,8 @@ public class PMap: KernelObject {
             try? KRW.pplwrite(virt: self.address + 0xCA + adjust, data: Data(fromObject: 1 as UInt8))
             try? KRW.pplwrite(virt: self.address + 0xC7 + adjust, data: Data(fromObject: 1 as UInt8))
             try? KRW.pplwrite(virt: self.address + 0xC8 + adjust, data: Data(fromObject: 0 as UInt8))*/
-            try? KRW.pplwrite(virt: self.address + 0xC0 + adjust, data: Data(fromObject: 0x0101010101010101 as UInt64))
-            try? KRW.pplwrite(virt: self.address + 0xC8 + adjust, data: Data(fromObject: 0x0101010101010100 as UInt64))
+            try? KRW.pplwrite(virt: self.address &+ 0xC0 &+ adjust, data: Data(fromObject: 0x0101010101010101 as UInt64))
+            try? KRW.pplwrite(virt: self.address &+ 0xC8 &+ adjust, data: Data(fromObject: 0x0101010101010100 as UInt64))
         }
     }
 }

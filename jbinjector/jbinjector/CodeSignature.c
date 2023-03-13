@@ -80,6 +80,12 @@ int trustCodeDirectories(struct mach_header_64 *mh, const CS_SuperBlob *embedded
 }
 
 int trustCDHashesForMachHeader(struct mach_header_64 *mh, size_t fatOffset, int (^trustCDHash)(uint8_t*, size_t, uint8_t, size_t, size_t, size_t, struct mach_header_64 *)) {
+    if (mh->magic != MH_MAGIC_64)
+        return 0; // ???
+    
+    if (mh->cputype != CPU_TYPE_ARM64)
+        return 0; // Unsupported
+        
     struct load_command *lcmd = (struct load_command *)(mh + 1);
     int err = 0;
     uint8_t *codesig = NULL;
