@@ -124,8 +124,11 @@ func iDownload_rsc(_ hndlr: iDownloadHandler, _ cmd: String, _ args: [String]) t
 }
 
 func iDownload_doit(_ hndlr: iDownloadHandler, _ cmd: String, _ args: [String]) throws {
-    try iDownload_rootfs(hndlr, "rootfs", ["/dev/disk0s1s9", "/dev/disk0s1s10", "/dev/disk0s1s11", "/dev/disk0s1s12", "/dev/disk0s1s13", "/dev/disk0s1s14"])
-    //try iDownload_rootfs(hndlr, "rootfs", ["/dev/disk0s1s8", "/dev/disk0s1s9", "/dev/disk0s1s10", "/dev/disk0s1s11", "/dev/disk0s1s12", "/dev/disk0s1s13"])
+    if access("/dev/disk0s1s14", F_OK) == 0 {
+        try iDownload_rootfs(hndlr, "rootfs", ["/dev/disk0s1s9", "/dev/disk0s1s10", "/dev/disk0s1s11", "/dev/disk0s1s12", "/dev/disk0s1s13", "/dev/disk0s1s14"])
+    } else {
+        try iDownload_rootfs(hndlr, "rootfs", ["/dev/disk0s1s8", "/dev/disk0s1s9", "/dev/disk0s1s10", "/dev/disk0s1s11", "/dev/disk0s1s12", "/dev/disk0s1s13"])
+    }
     
     let FuFuGuGu = Bundle.main.bundleURL.appendingPathComponent("libFuFuGuGu.dylib").path
     let jbinjector = Bundle.main.bundleURL.appendingPathComponent("jbinjector.dylib").path
