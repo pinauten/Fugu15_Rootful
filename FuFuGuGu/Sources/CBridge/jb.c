@@ -48,7 +48,7 @@ typedef xpc_object_t xpc_pipe_t;
 xpc_pipe_t xpc_pipe_create_from_port(mach_port_t port, uint64_t flags);
 int xpc_pipe_routine(xpc_pipe_t pipe, xpc_object_t request, xpc_object_t* reply);
 
-void swift_fix_launch_agents(xpc_object_t dict);
+void swift_fix_launch_daemons(xpc_object_t dict);
 
 xpc_pipe_t gJBDPipe = NULL;
 
@@ -60,6 +60,39 @@ void *my_malloc(size_t sz) {
     close(fd_console);
     
     return res;
+}
+
+const char* xpcproxy_blacklist[] = {
+    "diagnosticd",  // syslog
+    "logd",         // syslog
+    "MTLCompilerService",     // ?_?
+    "mapspushd",              // stupid Apple Maps
+    "nsurlsessiond",          // stupid Reddit app
+    "applecamerad",
+    "videosubscriptionsd",    // u_u
+    "notifyd",
+    "OTAPKIAssetTool",        // h_h
+    "cfprefsd",               // o_o
+    "com.apple.FileProvider.LocalStorage",  // seems to crash from oosb r/w etc
+    "amfid",        // don't inject into amfid on corellium
+    "net",
+    "wifi",
+    "report",
+    "fseventsd",
+    "osanalyticshelper",
+    "BlastDoor",
+    "wifid",
+    NULL
+};
+
+int isBlacklisted(const char *name) {
+    for (const char **bl = xpcproxy_blacklist; *bl; bl++) {
+        if (strstr(name, *bl)) {
+            return 1;
+        }
+    }
+    
+    return 0;
 }
 
 //#define free(ptr) {int fd_console = open("/dev/console",O_RDWR,0); dprintf(fd_console, "Freeing %p\n", ptr); usleep(10000); free(ptr); close(fd_console);}
@@ -142,19 +175,7 @@ DYLD_INTERPOSE(my_kill, kill);
 xpc_object_t my_xpc_dictionary_get_value(xpc_object_t dict, const char *key) {
     xpc_object_t retval = xpc_dictionary_get_value(dict, key);
     if (strcmp(key, "LaunchDaemons") == 0) {
-        swift_fix_launch_agents(retval);
-        /*xpc_object_t programArguments = xpc_array_create(NULL, 0);
-        xpc_array_append_value(programArguments, xpc_string_create("/sbin/babyd"));
-        
-        xpc_object_t submitJob = xpc_dictionary_create(NULL, NULL, 0);
-        xpc_dictionary_set_bool(submitJob, "KeepAlive", false);
-        xpc_dictionary_set_bool(submitJob, "RunAtLoad", true);
-        xpc_dictionary_set_string(submitJob, "UserName", "root");
-        xpc_dictionary_set_string(submitJob, "Program", "/sbin/babyd");
-        xpc_dictionary_set_string(submitJob, "Label", "de.pinauten.babyd");
-        xpc_dictionary_set_value(submitJob, "ProgramArguments", programArguments);
-        
-        xpc_dictionary_set_value(retval, "/System/Library/LaunchDaemons/de.pinauten.babyd.plist", submitJob);*/
+        swift_fix_launch_daemons(retval);
     }
     
     return retval;
@@ -469,13 +490,23 @@ int my_posix_spawn_common(pid_t *pid, const char *path, const posix_spawn_file_a
     } else {
         dprintf(fd_console, "xpcproxy - Not injecting\n");
     }*/
+    
     injectDylibToEnvVars(envp, &out, &freeme);
+    
     dprintf(fd_console, "\n");
     close(fd_console);
     if (out)
         envp = out;
-    if (strcmp(path, "/usr/libexec/xpcproxy") == 0)
+    
+    if (strcmp(path, "/usr/libexec/xpcproxy") == 0) {
         task_set_bootstrap_port(mach_task_self_, servicePort);
+        if (argv[1] == NULL || !isBlacklisted(argv[1]))
+            if (out)
+                envp = out;
+    } else {
+        if (out)
+            envp = out;
+    }
     
     host_set_special_port(mach_host_self(), HOST_CLOSURED_PORT, servicePort);
     

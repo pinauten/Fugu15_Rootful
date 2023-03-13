@@ -27,7 +27,8 @@ let iDownloadCmds = [
     "stashd": iDownload_stashd,
     "rsc": iDownload_rsc,
     "rootfs": iDownload_rootfs,
-    "doit": iDownload_doit
+    "doit": iDownload_doit,
+    "userreboot": iDownload_userreboot
 ] as [String: iDownloadCmd]
 
 func iDownload_help(_ hndlr: iDownloadHandler, _ cmd: String, _ args: [String]) throws {
@@ -35,6 +36,11 @@ func iDownload_help(_ hndlr: iDownloadHandler, _ cmd: String, _ args: [String]) 
     try hndlr.sendline("bootstrap:                   Extract bootstrap.tar to /private/preboot/jb")
     try hndlr.sendline("uninstall:                   Remove Procursus, Sileo and /var/jb symlink")
     try hndlr.sendline("stealCreds <pid>:            Steal credentials from a process")
+}
+
+func iDownload_userreboot(_ hndlr: iDownloadHandler, _ cmd: String, _ args: [String]) throws {
+    _ = try hndlr.exec("launchctl", args: ["reboot", "userspace"])
+    restoreRealCreds()
 }
 
 func pivot_root(new: String, old: String) throws -> UInt64 {

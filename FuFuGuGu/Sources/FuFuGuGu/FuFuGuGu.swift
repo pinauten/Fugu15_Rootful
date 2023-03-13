@@ -368,12 +368,12 @@ public func swift_init(_ consoleFD: Int32, _ servicePort: mach_port_t, _ XPCServ
     }
 }
 
-@_cdecl("swift_fix_launch_agents")
-public func swift_fix_launch_agents(_ rObj: UnsafeMutableRawPointer) {
+@_cdecl("swift_fix_launch_daemons")
+public func swift_fix_launch_daemons(_ rObj: UnsafeMutableRawPointer) {
     let obj = Unmanaged<xpc_object_t>.fromOpaque(rObj).takeUnretainedValue()
     
-    for i in (try? FileManager.default.contentsOfDirectory(atPath: "/Library/LaunchAgents")) ?? [] {
-        let path = "/Library/LaunchAgents/" + i
+    for i in (try? FileManager.default.contentsOfDirectory(atPath: "/Library/LaunchDaemons")) ?? [] {
+        let path = "/Library/LaunchDaemons/" + i
         if let plistData = try? Data(contentsOf: URL(fileURLWithPath: path)) {
             if let plist = try? PropertyListSerialization.propertyList(from: plistData, format: nil) as? [String: XPCObject?] {
                 let xpc = XPCDict(fromSwiftDict: plist)

@@ -34,6 +34,8 @@ func getSurfacePort(magic: UInt64 = 1337) throws -> mach_port_t {
     return port
 }
 
+var realUcred: UInt64?
+
 func testkrwstuff() throws {
     let port = try getSurfacePort()
     let surface = try KRW.rPtr(virt: try KRW.ourProc!.task!.getKObject(ofPort: port) + 0x18 /* IOSurfaceSendRight -> IOSurface */)
@@ -48,6 +50,8 @@ func testkrwstuff() throws {
     print("Hilo!")
     
     try KRW.doPPLBypass()
+    
+    realUcred = KRW.ourProc?.ucred
     KRW.ourProc?.ucred = try Proc(pid: 1)?.ucred
 }
 
@@ -57,4 +61,8 @@ func withKernelCredentials<T>(_ block: () throws -> T) rethrows -> T {
     defer { KRW.ourProc?.ucred = saved }
     
     return try block()
+}
+
+func restoreRealCreds() {
+    KRW.ourProc?.ucred = realUcred
 }
