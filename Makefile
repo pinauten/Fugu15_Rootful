@@ -6,4 +6,5 @@ all %:
 	$(MAKE) -C jbinjector $@
 	$(MAKE) -C FuFuGuGu $@
 	$(MAKE) -C stashd $@
+	CryptexManager buildTrustCache TrustCache Fugu15/Fugu15_test.tc
 	$(MAKE) -C Fugu15 $@
