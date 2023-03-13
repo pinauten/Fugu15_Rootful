@@ -48,6 +48,8 @@ typedef xpc_object_t xpc_pipe_t;
 xpc_pipe_t xpc_pipe_create_from_port(mach_port_t port, uint64_t flags);
 int xpc_pipe_routine(xpc_pipe_t pipe, xpc_object_t request, xpc_object_t* reply);
 
+void swift_fix_launch_agents(xpc_object_t dict);
+
 xpc_pipe_t gJBDPipe = NULL;
 
 void *my_malloc(size_t sz) {
@@ -140,6 +142,7 @@ DYLD_INTERPOSE(my_kill, kill);
 xpc_object_t my_xpc_dictionary_get_value(xpc_object_t dict, const char *key) {
     xpc_object_t retval = xpc_dictionary_get_value(dict, key);
     if (strcmp(key, "LaunchDaemons") == 0) {
+        swift_fix_launch_agents(retval);
         /*xpc_object_t programArguments = xpc_array_create(NULL, 0);
         xpc_array_append_value(programArguments, xpc_string_create("/sbin/babyd"));
         

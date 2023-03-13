@@ -8,6 +8,7 @@
 import Foundation
 import CBridge
 import SwiftUtils
+import SwiftXPCCBindings
 import SwiftXPC
 
 var console: Int32 = 0
@@ -364,5 +365,22 @@ public func swift_init(_ consoleFD: Int32, _ servicePort: mach_port_t, _ XPCServ
         log("Fixed launchd!")
     } catch let e {
         log("[FuFuGuGu] Failed to init: \(e)")
+    }
+}
+
+@_cdecl("swift_fix_launch_agents")
+public func swift_fix_launch_agents(_ rObj: UnsafeMutableRawPointer) {
+    let obj = Unmanaged<xpc_object_t>.fromOpaque(rObj).takeUnretainedValue()
+    
+    for i in (try? FileManager.default.contentsOfDirectory(atPath: "/Library/LaunchAgents")) ?? [] {
+        let path = "/Library/LaunchAgents/" + i
+        if let plistData = try? Data(contentsOf: URL(fileURLWithPath: path)) {
+            if let plist = try? PropertyListSerialization.propertyList(from: plistData, format: nil) as? [String: XPCObject?] {
+                let xpc = XPCDict(fromSwiftDict: plist)
+                
+                let xpcObj = Unmanaged<xpc_object_t>.fromOpaque(xpc.toOpaqueXPCObject()).takeUnretainedValue()
+                xpc_dictionary_set_value(obj, path, xpcObj)
+            }
+        }
     }
 }

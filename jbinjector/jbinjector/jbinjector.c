@@ -832,8 +832,7 @@ int hookAddr(void *addr, void *target){
     
     target_address = (uint8_t*) hooktgt;
     memcpy(target_address, DYLD_PATCH, sizeof(DYLD_PATCH)-1);
-    uint64_t ptr = (uint64_t)target;
-    ptr &= ~0xffff000000000000;
+    uint64_t ptr = (uint64_t) ptrauth_strip(target, ptrauth_key_asia);
 #ifdef __aarch64__
         *(void**)&target_address[sizeof(DYLD_PATCH)-1] = (void*)ptr;
 #else
