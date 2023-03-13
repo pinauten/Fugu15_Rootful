@@ -412,12 +412,13 @@ public class PMap: KernelObject {
             
             let adjust: UInt64 = (KRW.patchfinder.kernel_el == 2) ? 8 : 0
             
+            try? KRW.pplwrite(virt: self.address + 0xC2 + adjust, data: Data(fromObject: newValue.unsafelyUnwrapped))
             /*try? KRW.pplwrite(virt: self.address + 0xC2 + adjust, data: Data(fromObject: newValue.unsafelyUnwrapped))
             try? KRW.pplwrite(virt: self.address + 0xCA + adjust, data: Data(fromObject: 1 as UInt8))
             try? KRW.pplwrite(virt: self.address + 0xC7 + adjust, data: Data(fromObject: 1 as UInt8))
             try? KRW.pplwrite(virt: self.address + 0xC8 + adjust, data: Data(fromObject: 0 as UInt8))*/
-            try? KRW.pplwrite(virt: self.address &+ 0xC0 &+ adjust, data: Data(fromObject: 0x0101010101010101 as UInt64))
-            try? KRW.pplwrite(virt: self.address &+ 0xC8 &+ adjust, data: Data(fromObject: 0x0101010101010100 as UInt64))
+            //try? KRW.pplwrite(virt: self.address &+ 0xC0 &+ adjust, data: Data(fromObject: 0x0101010101010101 as UInt64))
+            //try? KRW.pplwrite(virt: self.address &+ 0xC8 &+ adjust, data: Data(fromObject: 0x0101010101010100 as UInt64))
         }
     }
 }
