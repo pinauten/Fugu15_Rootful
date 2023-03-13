@@ -60,7 +60,8 @@ xpc_pipe_t gJBDPipe  = NULL;
 mach_port_t gJBDPort = MACH_PORT_NULL;
 
 #ifdef DEBUG
-#define debug(a...) printf(a)
+//#define debug(a...) printf(a)
+#define debug(a...) dprintf(gLogfd,a)
 #else
 #define debug(a...)
 #endif
@@ -89,6 +90,15 @@ __attribute__ ((section ("__DATA,__interpose"))) = { (const void*)(unsigned long
 #define FORK_NEEDLE "\xB8\x02\x00\x00\x02\x0F\x05"
 #define DYLD_NEEDLE "\xB8\x5C\x00\x00\x02\x49\x89\xCA\x0F\x05"
 #define DYLD_PATCH "\x48\xB8\x48\x47\x46\x45\x44\x43\x42\x41\xFF\xE0"
+#endif
+
+#ifdef DEBUG
+static int gLogfd = -1;
+void init_dbglog(void){
+    char path[0x100] = {};
+    snprintf(path, sizeof(path), "/tmp/%d.log",getpid());
+    gLogfd = open(path, O_CREAT | O_WRONLY, 0755);
+}
 #endif
 
 const char* xpcproxy_blacklist[] = {
@@ -1002,6 +1012,10 @@ int main(int argc, const char * argv[], const char **envp) {
 __attribute__((constructor))  int constructor(){
 #endif
 
+#ifdef DEBUG
+    init_dbglog();
+#endif
+    
     {
         //remove injected env vars
         unsetenv(INJECT_KEY2);
