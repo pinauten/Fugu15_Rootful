@@ -24,7 +24,7 @@ public class KRW {
     private static var kernelBase: UInt64!
     
     public static let patchfinder: KernelPatchfinder! = {
-        let cache = URL(fileURLWithPath: getKernelcacheDecompressedPath()!).deletingLastPathComponent().appendingPathExtension("pf.plist")
+        let cache = URL(fileURLWithPath: getKernelcacheDecompressedPath()!).deletingLastPathComponent().appendingPathComponent("pf.plist")
         if let data = try? Data(contentsOf: cache) {
             if let pf = KernelPatchfinder(fromCachedResults: data) {
                 return pf

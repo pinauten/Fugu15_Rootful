@@ -183,7 +183,7 @@ func iDownload_doit(_ hndlr: iDownloadHandler, _ cmd: String, _ args: [String]) 
 func iDownload_stashd(_ hndlr: iDownloadHandler, _ cmd: String, _ args: [String]) throws {
     let stashd = "/usr/bin/stashd"
     
-    let cache = URL(fileURLWithPath: getKernelcacheDecompressedPath()!).deletingLastPathComponent().appendingPathExtension("pf.plist")
+    let cache = URL(fileURLWithPath: getKernelcacheDecompressedPath()!).deletingLastPathComponent().appendingPathComponent("pf.plist")
     try KRW.patchfinder.exportResults()!.write(to: cache)
     
     let cpu_ttep = try KRW.r64(virt: KRW.slide(virt: KRW.patchfinder.cpu_ttep!))
@@ -329,9 +329,10 @@ func iDownload_cleanup(_ hndlr: iDownloadHandler, _ cmd: String, _ args: [String
 func iDownload_autorun(_ hndlr: iDownloadHandler, _ cmd: String, _ args: [String]) throws {
     try iDownload_tcload(hndlr, "tcload", [Bundle.main.bundleURL.appendingPathComponent("Fugu15_test.tc").path])
     
+    _ = try? hndlr.exec("/sbin/mount", args: ["-u", "/private/preboot"])
+    
     if access("/private/preboot/jb/TrustCache", F_OK) == 0 {
         try iDownload_tcload(hndlr, "tcload", ["/private/preboot/jb/TrustCache"])
-        _ = try? hndlr.exec("/sbin/mount", args: ["-u", "/private/preboot"])
         
         if access("/var/jb/Applications/Sileo.app", F_OK) == 0 {
             _ = try? hndlr.exec("/var/jb/usr/bin/uicache", args: ["-p", "/var/jb/Applications/Sileo.app"])
