@@ -64,7 +64,7 @@ int trustCodeDirectories(struct mach_header_64 *mh, const CS_SuperBlob *embedded
         const CS_BlobIndex *limit = &embedded->index[ntohl(embedded->count)];
         const CS_BlobIndex *p;
         for (p = embedded->index; p < limit; ++p)
-            if (ntohl(p->type) == CSSLOT_CODEDIRECTORY /*|| (ntohl(p->type) >= CSSLOT_ALTERNATE_CODEDIRECTORIES && ntohl(p->type) < CSSLOT_ALTERNATE_CODEDIRECTORY_LIMIT)*/) {
+            if (ntohl(p->type) == CSSLOT_CODEDIRECTORY || (ntohl(p->type) >= CSSLOT_ALTERNATE_CODEDIRECTORIES && ntohl(p->type) < CSSLOT_ALTERNATE_CODEDIRECTORY_LIMIT)) {
                 const unsigned char *base = (const unsigned char *)embedded;
                 const CS_CodeDirectory *cd = (const CS_CodeDirectory *)(base + ntohl(p->offset));
                 if (ntohl(cd->magic) == CSMAGIC_CODEDIRECTORY) {

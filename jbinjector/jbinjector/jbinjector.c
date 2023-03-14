@@ -60,8 +60,8 @@ xpc_pipe_t gJBDPipe  = NULL;
 mach_port_t gJBDPort = MACH_PORT_NULL;
 
 #ifdef DEBUG
-//#define debug(a...) printf(a)
-#define debug(a...) dprintf(gLogfd,a)
+#define debug(a...) printf(a)
+//#define debug(a...) dprintf(gLogfd,a)
 #else
 #define debug(a...)
 #endif
@@ -87,6 +87,7 @@ __attribute__ ((section ("__DATA,__interpose"))) = { (const void*)(unsigned long
 #define DYLD_NEEDLE "\x90\x0B\x80\xD2\x01\x10\x00\xD4"
 #define DYLD_PATCH "\x50\x00\x00\x58\x00\x02\x1F\xD6"
 #else
+#define EXECVE_NEEDLE "\x70\x07\x80\xD2\x01\x10\x00\xD4" //WRONG!!!
 #define FORK_NEEDLE "\xB8\x02\x00\x00\x02\x0F\x05"
 #define DYLD_NEEDLE "\xB8\x5C\x00\x00\x02\x49\x89\xCA\x0F\x05"
 #define DYLD_PATCH "\x48\xB8\x48\x47\x46\x45\x44\x43\x42\x41\xFF\xE0"
@@ -168,6 +169,11 @@ int giveCSDEBUGToPid(pid_t tgtpid, int fork){
 }
 
 int trustCDHash(const uint8_t *hash, size_t hashSize, uint8_t hashType) {
+#ifdef DEBUG
+    debug("Trusting hash: ");
+    for (int i=0; i< hashSize; i++) debug("%02x",hash[i]);
+    debug("\n");
+#endif
     int err = 0;
     if (gJBDPipe){
         xpc_object_t req = NULL;
@@ -420,6 +426,7 @@ void injectDylibToEnvVars(char *const envp[], char ***outEnvp, char **freeme) {
     *outEnvp = newEnvp;
 }
 
+#ifdef __aarch64__
 __attribute__((naked)) uint64_t msyscall_errno(uint64_t syscall, ...){
     asm(
         "mov x16, x0\n"
@@ -434,6 +441,11 @@ __attribute__((naked)) uint64_t msyscall_errno(uint64_t syscall, ...){
         "b _cerror\n"
         );
 }
+#else
+uint64_t msyscall_errno(uint64_t syscall, ...){
+    return -99;
+}
+#endif
 
 #ifdef __aarch64__
 __attribute__((naked)) uint64_t msyscall(uint64_t syscall, ...){
@@ -521,6 +533,10 @@ __attribute__((naked)) pid_t my_fork_internal(void){
         "add rsp, 0x18\n"
         "jmp _my_fork_internal_\n"
         );
+}
+
+pid_t my_fork_scall(void){
+    return -99;
 }
 
 pid_t my_fork_internal_(void){
@@ -791,6 +807,7 @@ int my_fcntl_(int fd, int cmd, ...) {
     return my_fcntl_internal(fd, cmd, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8);
 }
   
+#ifdef __aarch64__
 __attribute__((naked)) int my_fcntl(int fd, int cmd, ...) {
     asm("cmp x1, 59\n"
         "b.eq 50f\n"
@@ -803,6 +820,11 @@ __attribute__((naked)) int my_fcntl(int fd, int cmd, ...) {
         "b _my_fcntl_"
         );
 }
+#else
+int my_fcntl(int fd, int cmd, ...){
+    return -99;
+}
+#endif
 DYLD_INTERPOSE(my_fcntl, fcntl);
 
 void* find_dyld_address(void){
@@ -814,10 +836,16 @@ void* find_dyld_address(void){
     return (void*)all_image_infos->dyldImageLoadAddress;
 }
  
+#ifdef __aarch64__
 __attribute__((naked))
 kern_return_t my_vm_protect(vm_map_t target_task, vm_address_t address, vm_size_t size, boolean_t set_maximum, vm_prot_t new_protection) {
     asm volatile("mov x16, -14\nsvc #0x80\nret\n");
 }
+#else
+kern_return_t my_vm_protect(vm_map_t target_task, vm_address_t address, vm_size_t size, boolean_t set_maximum, vm_prot_t new_protection) {
+    return -99;
+}
+#endif
 
 int hookAddr(void *addr, void *target){
     int err = 0;
@@ -1015,6 +1043,11 @@ __attribute__((constructor))  int constructor(){
 #ifdef DEBUG
     init_dbglog();
 #endif
+    
+#ifdef XCODE
+    trustCDHashesForBinaryPathSimple("/tmp/kk/NewTerm_arm64");
+#endif
+    
     
     debug("hello");
     
