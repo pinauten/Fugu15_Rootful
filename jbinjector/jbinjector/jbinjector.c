@@ -93,8 +93,6 @@ __attribute__ ((section ("__DATA,__interpose"))) = { (const void*)(unsigned long
 #define DYLD_PATCH "\x48\xB8\x48\x47\x46\x45\x44\x43\x42\x41\xFF\xE0"
 #endif
 
-#define DEBUG 1
-
 #ifdef DEBUG
 static int gLogfd = -1;
 void init_dbglog(void){
