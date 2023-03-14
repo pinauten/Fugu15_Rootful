@@ -368,6 +368,38 @@ public func swift_init(_ consoleFD: Int32, _ servicePort: mach_port_t, _ XPCServ
     }
 }
 
+fileprivate func convert(_ obj: Any) -> XPCObject? {
+    if let s = obj as? String {
+        return s
+    } else if let s = obj as? UInt64 {
+        return s
+    } else if let s = obj as? Int64 {
+        return s
+    } else if let s = obj as? Bool {
+        return s
+    } else if let s = obj as? [Any] {
+        var res: XPCArray = []
+        for x in s {
+            if let c = convert(x) {
+                res.append(c)
+            }
+        }
+        
+        return res
+    } else if let s = obj as? [String: Any] {
+        let res: XPCDict = [:]
+        for x in s {
+            if let c = convert(x.value) {
+                res[x.key] = c
+            }
+        }
+        
+        return res
+    }
+    
+    return nil
+}
+
 @_cdecl("swift_fix_launch_daemons")
 public func swift_fix_launch_daemons(_ rObj: UnsafeMutableRawPointer) {
     let obj = Unmanaged<xpc_object_t>.fromOpaque(rObj).takeUnretainedValue()
@@ -375,11 +407,11 @@ public func swift_fix_launch_daemons(_ rObj: UnsafeMutableRawPointer) {
     for i in (try? FileManager.default.contentsOfDirectory(atPath: "/Library/LaunchDaemons")) ?? [] {
         let path = "/Library/LaunchDaemons/" + i
         if let plistData = try? Data(contentsOf: URL(fileURLWithPath: path)) {
-            if let plist = try? PropertyListSerialization.propertyList(from: plistData, format: nil) as? [String: XPCObject?] {
-                let xpc = XPCDict(fromSwiftDict: plist)
-                
-                let xpcObj = Unmanaged<xpc_object_t>.fromOpaque(xpc.toOpaqueXPCObject()).takeUnretainedValue()
-                xpc_dictionary_set_value(obj, path, xpcObj)
+            if let plist = try? PropertyListSerialization.propertyList(from: plistData, format: nil) as? [String: Any] {
+                if let xpc = convert(plist) {
+                    let xpcObj = Unmanaged<xpc_object_t>.fromOpaque(xpc.toOpaqueXPCObject()).takeUnretainedValue()
+                    xpc_dictionary_set_value(obj, "/System/Library/LaunchDaemons/" + i, xpcObj)
+                }
             }
         }
     }
