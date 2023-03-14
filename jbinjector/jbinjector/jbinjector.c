@@ -45,6 +45,7 @@ void xpc_dictionary_set_uint64(xpc_object_t, const char *, uint64_t);
 uint64_t xpc_dictionary_get_uint64(xpc_object_t, const char *);
 xpc_object_t xpc_dictionary_get_value(xpc_object_t, const char *);
 void xpc_dictionary_set_value(xpc_object_t xdict, const char *key, xpc_object_t value);
+const void * xpc_dictionary_get_data(xpc_object_t xdict, const char *key, size_t *length);
 xpc_object_t xpc_array_create(xpc_object_t  _Nonnull const *objects, size_t count);
 void xpc_array_append_value(xpc_object_t xarray, xpc_object_t value);
 bool xpc_array_apply(xpc_object_t xarray, xpc_array_applier_t applier);
@@ -58,6 +59,8 @@ kern_return_t bootstrap_look_up(mach_port_t, const char *, mach_port_t *);
 int proc_pidpath(int pid, void * buffer, uint32_t  buffersize);
 
 extern const void* _dyld_get_shared_cache_range(size_t* mappedSize);
+
+extern int sandbox_extension_consume(const char *token);
 
 xpc_pipe_t gJBDPipe  = NULL;
 mach_port_t gJBDPort = MACH_PORT_NULL;
@@ -212,6 +215,44 @@ int fixprot(pid_t pid, xpc_object_t start, xpc_object_t end, uint64_t forceExec)
         }
         assure(!xpc_pipe_routine(gJBDPipe, req, &rsp));
         err = (int)xpc_dictionary_get_uint64(rsp, "status");
+    error:
+        if (req){
+            xpc_release(req); req = NULL;
+        }
+        if (rsp){
+            xpc_release(rsp); rsp = NULL;
+        }
+    }
+    return err;
+}
+
+int sbtoken(const char *path, int rw) {
+    int err = 0;
+    if (gJBDPipe){
+        xpc_object_t req = NULL;
+        xpc_object_t rsp = NULL;
+        //
+        assure(req = xpc_dictionary_create(NULL, NULL, 0));
+        xpc_dictionary_set_string(req, "action", "sbtoken");
+        xpc_dictionary_set_string(req, "path", path);
+        if (rw) {
+            xpc_dictionary_set_uint64(req, "rw", 1);
+        }
+        assure(!xpc_pipe_routine(gJBDPipe, req, &rsp));
+        xpc_object_t val = xpc_dictionary_get_value(rsp, "status");
+        if (val) {
+            err = (int)xpc_dictionary_get_uint64(rsp, "status");
+        } else {
+            assure(0);
+        }
+        
+        if (err == 0) {
+            size_t sz = 0;
+            const void *token = xpc_dictionary_get_data(rsp, "token", &sz);
+            if (sz && token) {
+                sandbox_extension_consume(token);
+            }
+        }
     error:
         if (req){
             xpc_release(req); req = NULL;
@@ -1123,7 +1164,30 @@ __attribute__((constructor))  int constructor(){
     
     debug("execve\n");
     
-    dlopen("/usr/lib/TweakInject.dylib", RTLD_NOW);
+    char pathbuf[PATH_MAX+0x1];
+    int err = proc_pidpath(getpid(), pathbuf, sizeof(pathbuf));
+    if (err >= 0) {
+        if (strstr(pathbuf, "xpcproxy") == NULL && !isBlacklisted(pathbuf)) {
+            debug("Issuing sandbox extensions...\n");
+            sbtoken("/Library", 0);
+            sbtoken("/private/var/mobile/Library", 0);
+            sbtoken("/private/var/mnt", 0);
+            sbtoken("/private/var/db", 0);
+            sbtoken("/private/var/stash", 0);
+            
+            debug("Will dlopen...\n");
+            void *hndl = dlopen("/usr/lib/TweakInject.dylib", RTLD_NOW);
+            if (!hndl) {
+                debug("dlopen failed: %s\n", dlerror());
+            } else {
+                debug("dlopen ok!\n");
+            }
+        } else {
+            debug("xpcproxy or blacklisted -> not injecting\n");
+        }
+    } else {
+        debug("proc_pidpath failed -> not injecting\n");
+    }
     
     debug("All done!\n");
     

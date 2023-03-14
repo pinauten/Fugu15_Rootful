@@ -261,6 +261,28 @@ func handleXPC(request: XPCDict, reply: XPCDict) -> UInt64 {
                 return 1
             }
             
+        case "sbtoken":
+            if let path = request["path"] as? String {
+                let writeI = (request["rw"] as? UInt64) ?? 0
+                let write  = writeI != 0
+                let action = write ? APP_SANDBOX_READ_WRITE : APP_SANDBOX_READ
+                if let token  = sandbox_extension_issue_file(action, path, 0, 0) {
+                    defer { free(token) }
+                    
+                    var sz = malloc_size(token)
+                    if sz == 0 {
+                        sz = 0x40
+                    }
+                    
+                    reply["token"] = Data(bytes: token, count: sz)
+                    return 0
+                } else {
+                    return 2
+                }
+            } else {
+                return 1
+            }
+            
         default:
             break
         }

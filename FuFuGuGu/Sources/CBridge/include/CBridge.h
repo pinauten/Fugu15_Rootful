@@ -50,4 +50,11 @@ void xpc_dictionary_get_audit_token(xpc_object_t, audit_token_t *);
 pid_t audit_token_to_pid(audit_token_t atoken) API_AVAILABLE(ios(10));
 int audit_token_to_pidversion(audit_token_t atoken) API_AVAILABLE(ios(10));
 
+extern const char *APP_SANDBOX_READ;
+extern const char *APP_SANDBOX_READ_WRITE;
+
+extern char *sandbox_extension_issue_file(const char *ext, const char *path, int reserved, int flags);
+
+extern int sandbox_extension_release(const char *token);
+
 #endif /* CBridge_h */
