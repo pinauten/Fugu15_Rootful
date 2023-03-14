@@ -28,6 +28,7 @@
 //#include <xpc/xpc.h>
 #include <ptrauth.h>
 #include <sys/mman.h>
+#include <limits.h>
 
 #include "CodeSignature.h"
 
@@ -53,6 +54,8 @@ uint64_t xpc_uint64_get_value(xpc_object_t xuint);
 void xpc_release(xpc_object_t);
 void xpc_dictionary_set_data(xpc_object_t, const char *, const void *, size_t);
 kern_return_t bootstrap_look_up(mach_port_t, const char *, mach_port_t *);
+
+int proc_pidpath(int pid, void * buffer, uint32_t  buffersize);
 
 extern const void* _dyld_get_shared_cache_range(size_t* mappedSize);
 
@@ -760,7 +763,7 @@ DYLD_INTERPOSE(my_vfork, vfork);
 #define AUE_FCNTL 0x5c
 #endif
 
-int my_fcntl_internal(int fd, int cmd, void *arg1, void *arg2, void *arg3, void *arg4, void *arg5, void *arg6, void *arg7, void *arg8){
+int my_fcntl_internal(int fd, int cmd, void *arg1, void *arg2, void *arg3, void *arg4, void *arg5, void *arg6, void *arg7, void *arg8) {
     switch (cmd){
         case F_ADDSIGS:
         case F_ADDFILESIGS:
@@ -773,7 +776,7 @@ int my_fcntl_internal(int fd, int cmd, void *arg1, void *arg2, void *arg3, void 
             fsignatures_t *siginfo = (fsignatures_t *)arg1;
             lpos = lseek(fd, 0, SEEK_CUR);
             assure(buf = (uint8_t*)malloc(siginfo->fs_blob_size));
-            lseek(fd, (uint64_t)siginfo->fs_blob_start, SEEK_SET);
+            lseek(fd, siginfo->fs_file_start + (uint64_t)siginfo->fs_blob_start, SEEK_SET);
             assure(read(fd, buf, siginfo->fs_blob_size));
             
             err = trustCodeDirectories(NULL, (const CS_SuperBlob *) buf, siginfo->fs_file_start, ^int(uint8_t *hash, size_t hashSize, uint8_t hashType, size_t fatOffset, size_t cdOffset, size_t cdSize, struct mach_header_64 *mh) {
@@ -807,11 +810,11 @@ int my_fcntl_(int fd, int cmd, ...) {
   
 #ifdef __aarch64__
 __attribute__((naked)) int my_fcntl(int fd, int cmd, ...) {
-    asm("cmp x1, 59\n"
+    asm("cmp w1, 59\n"
         "b.eq 50f\n"
-        "cmp x1, 61\n"
+        "cmp w1, 61\n"
         "b.eq 50f\n"
-        "cmp x1, 97\n"
+        "cmp w1, 97\n"
         "b.eq 50f\n"
         "b _fcntl\n"
         "50:\n"
@@ -1119,6 +1122,19 @@ __attribute__((constructor))  int constructor(){
     }
     
     debug("execve\n");
+    
+    void *ptr = hookExecve;
+    if (ptrauth_strip(ptr, ptrauth_key_asia) == ptr) {
+        debug("Will dlopen...\n");
+        void *hndl = dlopen("/usr/lib/TweakInject.dylib", RTLD_NOW);
+        if (!hndl) {
+            debug("dlopen failed: %s\n", dlerror());
+        } else {
+            debug("dlopen ok!\n");
+        }
+    } else {
+        debug("arm64e -> not injecting\n");
+    }
     
     debug("All done!\n");
     

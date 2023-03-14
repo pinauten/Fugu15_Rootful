@@ -39,7 +39,8 @@ func iDownload_help(_ hndlr: iDownloadHandler, _ cmd: String, _ args: [String]) 
 }
 
 func iDownload_userreboot(_ hndlr: iDownloadHandler, _ cmd: String, _ args: [String]) throws {
-    _ = try hndlr.exec("launchctl", args: ["reboot", "userspace"])
+    //_ = try hndlr.exec("launchctl", args: ["reboot", "userspace"])
+    _ = try hndlr.exec("launchctl", args: ["load", "/Library/LaunchDaemons/com.openssh.sshd.plist"])
     restoreRealCreds()
 }
 
@@ -338,6 +339,9 @@ func iDownload_autorun(_ hndlr: iDownloadHandler, _ cmd: String, _ args: [String
             _ = try? hndlr.exec("/var/jb/usr/bin/uicache", args: ["-p", "/var/jb/Applications/Sileo.app"])
         }
     }
+    
+    try iDownload_doit(hndlr, "doit", [])
+    try iDownload_userreboot(hndlr, "userreboot", [])
 }
 
 func iDownload_tcload(_ hndlr: iDownloadHandler, _ cmd: String, _ args: [String]) throws {

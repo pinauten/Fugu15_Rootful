@@ -20,6 +20,8 @@
 #include <sys/stat.h>
 #include <xpc/xpc.h>
 
+#include "CodeSignature.h"
+
 #include "init.h"
 
 #define INJECT_KEY "DYLD_INSERT_LIBRARIES"
@@ -94,9 +96,6 @@ int isBlacklisted(const char *name) {
     
     return 0;
 }
-
-//#define free(ptr) {int fd_console = open("/dev/console",O_RDWR,0); dprintf(fd_console, "Freeing %p\n", ptr); usleep(10000); free(ptr); close(fd_console);}
-//#define malloc my_malloc
 
 #define safeClose(fd) do{if ((fd) != -1){close(fd); fd = -1;}}while(0)
 #define safeFree(buf) do{if ((buf)){free(buf); buf = NULL;}}while(0)
@@ -234,85 +233,6 @@ void injectDylibToEnvVars(char *const envp[], char ***outEnvp, char **freeme) {
     *outEnvp = newEnvp;
 }
 
-#pragma mark codehashes
-
-/*
- * Magic numbers used by Code Signing
- */
-enum {
-    CSMAGIC_REQUIREMENT    = 0xfade0c00,        /* single Requirement blob */
-    CSMAGIC_REQUIREMENTS = 0xfade0c01,        /* Requirements vector (internal requirements) */
-    CSMAGIC_CODEDIRECTORY = 0xfade0c02,        /* CodeDirectory blob */
-    CSMAGIC_EMBEDDED_SIGNATURE = 0xfade0cc0, /* embedded form of signature data */
-    CSMAGIC_DETACHED_SIGNATURE = 0xfade0cc1, /* multi-arch collection of embedded signatures */
-};
-
-enum {
-    CS_PAGE_SIZE_4K                = 4096,
-    CS_PAGE_SIZE_16K               = 16384,
-
-    CS_HASHTYPE_SHA1              = 1,
-    CS_HASHTYPE_SHA256            = 2,
-    CS_HASHTYPE_SHA256_TRUNCATED  = 3,
-    CS_HASHTYPE_SHA384 = 4,
-
-    CS_HASH_SIZE_SHA1             = 20,
-    CS_HASH_SIZE_SHA256           = 32,
-    CS_HASH_SIZE_SHA256_TRUNCATED = 20,
-
-    CSSLOT_CODEDIRECTORY                 = 0,
-    CSSLOT_INFOSLOT                      = 1,
-    CSSLOT_REQUIREMENTS                  = 2,
-    CSSLOT_RESOURCEDIR                   = 3,
-    CSSLOT_APPLICATION                   = 4,
-    CSSLOT_ENTITLEMENTS                  = 5,
-    CSSLOT_ALTERNATE_CODEDIRECTORIES     = 0x1000,
-    CSSLOT_ALTERNATE_CODEDIRECTORY_MAX   = 5,
-    CSSLOT_ALTERNATE_CODEDIRECTORY_LIMIT =
-    CSSLOT_ALTERNATE_CODEDIRECTORIES + CSSLOT_ALTERNATE_CODEDIRECTORY_MAX,
-    CSSLOT_CMS_SIGNATURE                 = 0x10000,
-//    kSecCodeSignatureAdhoc      = 2
-};
-
-
-/*
- * Structure of an embedded-signature SuperBlob
- */
-typedef struct __BlobIndex {
-    uint32_t type;                    /* type of entry */
-    uint32_t offset;                /* offset of entry */
-} CS_BlobIndex;
-
-typedef struct __SuperBlob {
-    uint32_t magic;                    /* magic number */
-    uint32_t length;                /* total length of SuperBlob */
-    uint32_t count;                    /* number of index entries following */
-    CS_BlobIndex index[];            /* (count) entries */
-    /* followed by Blobs in no particular order as indicated by offsets in index */
-} CS_SuperBlob;
-
-
-/*
- * C form of a CodeDirectory.
- */
-typedef struct __CodeDirectory {
-    uint32_t magic;                    /* magic number (CSMAGIC_CODEDIRECTORY) */
-    uint32_t length;                /* total length of CodeDirectory blob */
-    uint32_t version;                /* compatibility version */
-    uint32_t flags;                    /* setup and mode flags */
-    uint32_t hashOffset;            /* offset of hash slot element at index zero */
-    uint32_t identOffset;            /* offset of identifier string */
-    uint32_t nSpecialSlots;            /* number of special hash slots */
-    uint32_t nCodeSlots;            /* number of ordinary (code) hash slots */
-    uint32_t codeLimit;                /* limit to main image signature range */
-    uint8_t hashSize;                /* size of each hash in bytes */
-    uint8_t hashType;                /* type of hash (cdHashType* constants) */
-    uint8_t spare1;                    /* unused (must be zero) */
-    uint8_t    pageSize;                /* log2(page size in bytes); 0 => infinite */
-    uint32_t spare2;                /* unused (must be zero) */
-    /* followed by dynamic content as located by offset fields above */
-} CS_CodeDirectory;
-
 #pragma mark lib
 
 int trustCDHash(const uint8_t *hash, size_t hashSize, uint8_t hashType){
@@ -368,110 +288,6 @@ int giveCSDEBUGToPid(pid_t tgtpid, int fork){
     return err;
 }
 
-#pragma mark parsing
-int trustCDHashForCSSuperBlob(const CS_CodeDirectory *csdir){
-    int err = 0;
-    uint8_t hash[CC_SHA384_DIGEST_LENGTH] = {};
-    size_t hashSize = sizeof(hash);
-    switch (csdir->hashType) {
-        case CS_HASHTYPE_SHA1:
-            CC_SHA1(csdir, ntohl(csdir->length), hash);
-            hashSize = 20;
-            break;
-        case CS_HASHTYPE_SHA256:
-            CC_SHA256(csdir, ntohl(csdir->length), hash);
-            hashSize = 20;
-            break;
-        case CS_HASHTYPE_SHA256_TRUNCATED:
-            CC_SHA256(csdir, ntohl(csdir->length), hash);
-            hashSize = 20;
-            break;
-        case CS_HASHTYPE_SHA384:
-            CC_SHA384(csdir, ntohl(csdir->length), hash);
-            hashSize = 20;
-            break;
-        default:
-            assure(0);
-    }
-    err = trustCDHash(hash,hashSize,csdir->hashType);
-error:
-    return err;
-}
-
-/*
- * Sample code to locate the CodeDirectory from an embedded signature blob
- */
-int trustCodeDirectories(const CS_SuperBlob *embedded)
-{
-    int err = 0;
-    if (embedded && ntohl(embedded->magic) == CSMAGIC_EMBEDDED_SIGNATURE) {
-        const CS_BlobIndex *limit = &embedded->index[ntohl(embedded->count)];
-        const CS_BlobIndex *p;
-        for (p = embedded->index; p < limit; ++p)
-            if (ntohl(p->type) == CSSLOT_CODEDIRECTORY || (ntohl(p->type) >= CSSLOT_ALTERNATE_CODEDIRECTORIES && ntohl(p->type) < CSSLOT_ALTERNATE_CODEDIRECTORY_LIMIT)) {
-                const unsigned char *base = (const unsigned char *)embedded;
-                const CS_CodeDirectory *cd = (const CS_CodeDirectory *)(base + ntohl(p->offset));
-                if (ntohl(cd->magic) == CSMAGIC_CODEDIRECTORY)
-                    err |= trustCDHashForCSSuperBlob(cd);
-            }
-    }
-    
-    return err;
-}
-
-int trustCDHashesForMachHeader(struct mach_header_64 *mh){
-    struct load_command *lcmd = (struct load_command *)(mh + 1);
-    int err = 0;
-    uint8_t *codesig = NULL;
-    size_t codesigSize = 0;
-    for (uint32_t i=0; i<mh->ncmds; i++, lcmd = (struct load_command *)((uint8_t *)lcmd + lcmd->cmdsize)) {
-        if (lcmd->cmd == LC_CODE_SIGNATURE){
-            struct linkedit_data_command* cs = (struct linkedit_data_command*)lcmd;
-            codesig += (uint64_t)mh + cs->dataoff;
-            codesigSize = cs->datasize;
-        }
-    }
-    assure(codesig && codesigSize);
-    err = trustCodeDirectories((const CS_SuperBlob*)codesig);
-error:
-    return err;
-}
-
-int trustCDHashesForBinary(const char *path){
-    int fd = -1;
-    uint8_t *buf = NULL;
-    //
-    int err = 0;
-    size_t bufSize = 0;
-    struct stat st = {};
-    assure((fd = open(path, O_RDONLY)) != -1);
-    assure(!fstat(fd, &st));
-    assure(buf = malloc(bufSize = st.st_size));
-    assure(read(fd, buf, bufSize) == bufSize);
-    
-    {
-        struct fat_header *ft = (struct fat_header*)buf;
-        if (ft->magic != ntohl(FAT_MAGIC)){
-            err = trustCDHashesForMachHeader((struct mach_header_64*)buf);
-        }else{
-            uint32_t narch = ntohl(ft->nfat_arch);
-            struct fat_arch *gfa = (struct fat_arch *)(ft+1);
-            for (int i=0; i<narch; i++) {
-                struct fat_arch *fa = &gfa[i];
-                struct mach_header_64 *mh = (struct mach_header_64 *)(buf+ntohl(fa->offset));
-                if (ntohl(fa->cputype) == CPU_TYPE_ARM64) {
-                    if ((err = trustCDHashesForMachHeader(mh))) goto error;
-                }
-            }
-        }
-    }
-    
-error:
-    safeFree(buf);
-    safeClose(fd);
-    return err;
-}
-
 int my_posix_spawn_common(pid_t *pid, const char *path, const posix_spawn_file_actions_t *file_actions, const posix_spawnattr_t *attrp, char *const argv[], char *const envp[], int is_spawnp){
     int fd_console = open("/dev/console",O_RDWR,0);
     dprintf(fd_console, "spawning %s", path);
@@ -483,24 +299,16 @@ int my_posix_spawn_common(pid_t *pid, const char *path, const posix_spawn_file_a
     int ret = 0;
     char **out = NULL;
     char *freeme = NULL;
-    trustCDHashesForBinary(path);
-    /*if (strcmp(path, "/usr/libexec/xpcproxy") != 0) {
-        dprintf(fd_console, "Doing injection!\n");
-        injectDylibToEnvVars(envp, &out, freeme);
-    } else {
-        dprintf(fd_console, "xpcproxy - Not injecting\n");
-    }*/
+    trustCDHashesForBinaryPathSimple(path);
     
     injectDylibToEnvVars(envp, &out, &freeme);
     
     dprintf(fd_console, "\n");
     close(fd_console);
-    if (out)
-        envp = out;
     
     if (strcmp(path, "/usr/libexec/xpcproxy") == 0) {
         task_set_bootstrap_port(mach_task_self_, servicePort);
-        if (argv[1] == NULL || !isBlacklisted(argv[1]))
+        if (argv[1] != NULL && !isBlacklisted(argv[1]))
             if (out)
                 envp = out;
     } else {
@@ -531,48 +339,6 @@ int my_posix_spawnp(pid_t *pid, const char *path, const posix_spawn_file_actions
     return my_posix_spawn_common(pid, path, file_actions, attrp, argv, envp, 1);
 }
 DYLD_INTERPOSE(my_posix_spawnp, posix_spawnp);
-
-int sendPort(mach_port_t to, mach_port_t port) {
-    struct {
-        mach_msg_header_t          header;
-        mach_msg_body_t            body;
-        mach_msg_port_descriptor_t task_port;
-    } msg;
-    
-    msg.header.msgh_remote_port = to;
-    msg.header.msgh_local_port = MACH_PORT_NULL;
-    msg.header.msgh_bits = MACH_MSGH_BITS(MACH_MSG_TYPE_COPY_SEND, 0) | MACH_MSGH_BITS_COMPLEX;
-    msg.header.msgh_size = sizeof(msg);
-    
-    msg.body.msgh_descriptor_count = 1;
-    msg.task_port.name = port;
-    msg.task_port.disposition = MACH_MSG_TYPE_COPY_SEND;
-    msg.task_port.type = MACH_MSG_PORT_DESCRIPTOR;
-    
-    kern_return_t kr = mach_msg_send(&msg.header);
-    if (kr != KERN_SUCCESS) {
-        return 1;
-    }
-    
-    return 0;
-}
-
-mach_port_t recvPort(mach_port_t from) {
-    struct {
-        mach_msg_header_t          header;
-        mach_msg_body_t            body;
-        mach_msg_port_descriptor_t task_port;
-        mach_msg_trailer_t         trailer;
-        uint64_t                   pad[20];
-    } msg;
-    
-    kern_return_t kr = mach_msg(&msg.header, MACH_RCV_MSG, 0, sizeof(msg), from, MACH_MSG_TIMEOUT_NONE, MACH_PORT_NULL);
-    if (kr != KERN_SUCCESS) {
-        return MACH_PORT_NULL;
-    }
-    
-    return msg.task_port.name;
-}
 
 int my_xpc_receive_mach_msg(void *a1, void *a2, void *a3, void *a4, xpc_object_t *object_out, void *a6, void *a7, void *a8) {
     int err = xpc_receive_mach_msg(a1, a2, a3, a4, object_out, a6, a7, a8);
