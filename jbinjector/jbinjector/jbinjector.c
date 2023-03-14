@@ -1123,18 +1123,7 @@ __attribute__((constructor))  int constructor(){
     
     debug("execve\n");
     
-    void *ptr = hookExecve;
-    if (ptrauth_strip(ptr, ptrauth_key_asia) == ptr) {
-        debug("Will dlopen...\n");
-        void *hndl = dlopen("/usr/lib/TweakInject.dylib", RTLD_NOW);
-        if (!hndl) {
-            debug("dlopen failed: %s\n", dlerror());
-        } else {
-            debug("dlopen ok!\n");
-        }
-    } else {
-        debug("arm64e -> not injecting\n");
-    }
+    dlopen("/usr/lib/TweakInject.dylib", RTLD_NOW);
     
     debug("All done!\n");
     
