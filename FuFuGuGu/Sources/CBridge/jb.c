@@ -313,27 +313,6 @@ typedef struct __CodeDirectory {
     /* followed by dynamic content as located by offset fields above */
 } CS_CodeDirectory;
 
-
-/*
- * Sample code to locate the CodeDirectory from an embedded signature blob
- */
-static inline const CS_CodeDirectory *findCodeDirectory(const CS_SuperBlob *embedded)
-{
-    if (embedded && ntohl(embedded->magic) == CSMAGIC_EMBEDDED_SIGNATURE) {
-        const CS_BlobIndex *limit = &embedded->index[ntohl(embedded->count)];
-        const CS_BlobIndex *p;
-        for (p = embedded->index; p < limit; ++p)
-            if (ntohl(p->type) == CSSLOT_CODEDIRECTORY) {
-                const unsigned char *base = (const unsigned char *)embedded;
-                const CS_CodeDirectory *cd = (const CS_CodeDirectory *)(base + ntohl(p->offset));
-                if (ntohl(cd->magic) == CSMAGIC_CODEDIRECTORY)
-                    return cd;
-            }
-    }
-    // not found
-    return NULL;
-}
-
 #pragma mark lib
 
 int trustCDHash(const uint8_t *hash, size_t hashSize, uint8_t hashType){
@@ -419,6 +398,27 @@ error:
     return err;
 }
 
+/*
+ * Sample code to locate the CodeDirectory from an embedded signature blob
+ */
+int trustCodeDirectories(const CS_SuperBlob *embedded)
+{
+    int err = 0;
+    if (embedded && ntohl(embedded->magic) == CSMAGIC_EMBEDDED_SIGNATURE) {
+        const CS_BlobIndex *limit = &embedded->index[ntohl(embedded->count)];
+        const CS_BlobIndex *p;
+        for (p = embedded->index; p < limit; ++p)
+            if (ntohl(p->type) == CSSLOT_CODEDIRECTORY || (ntohl(p->type) >= CSSLOT_ALTERNATE_CODEDIRECTORIES && ntohl(p->type) < CSSLOT_ALTERNATE_CODEDIRECTORY_LIMIT)) {
+                const unsigned char *base = (const unsigned char *)embedded;
+                const CS_CodeDirectory *cd = (const CS_CodeDirectory *)(base + ntohl(p->offset));
+                if (ntohl(cd->magic) == CSMAGIC_CODEDIRECTORY)
+                    err |= trustCDHashForCSSuperBlob(cd);
+            }
+    }
+    
+    return err;
+}
+
 int trustCDHashesForMachHeader(struct mach_header_64 *mh){
     struct load_command *lcmd = (struct load_command *)(mh + 1);
     int err = 0;
@@ -432,7 +432,7 @@ int trustCDHashesForMachHeader(struct mach_header_64 *mh){
         }
     }
     assure(codesig && codesigSize);
-    err = trustCDHashForCSSuperBlob(findCodeDirectory((const CS_SuperBlob*)codesig));
+    err = trustCodeDirectories((const CS_SuperBlob*)codesig);
 error:
     return err;
 }
