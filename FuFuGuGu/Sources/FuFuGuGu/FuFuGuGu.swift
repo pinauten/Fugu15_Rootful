@@ -44,86 +44,12 @@ func handleXPC(request: XPCDict, reply: XPCDict) -> UInt64 {
                 if let proc = try? Proc(pid: pid_t(pid)) {
                     if let flags = proc.cs_flags {
                         proc.cs_flags = (flags & ~0x703b10) | 0x10000024
+                        
                         guard let pmap = proc.task?.vmMap?.pmap else {
                             return 4
                         }
                         
-                        pmap.debugged = 1
-                        
-                        /*if let parent = request["parentPid"] as? UInt64,
-                           parent != 0 {
-                            // Okay, now this is gonna be interesting
-                            // Copy protections from parent to child
-                            guard let linksChild = proc.task?.vmMap?.links else {
-                                return 5
-                            }
-                            
-                            guard let linksParent = try? Proc(pid: pid_t(parent))?.task?.vmMap?.links else {
-                                return 6
-                            }
-                            
-                            let mapParent = linksParent.address
-                            func shouldMakeExecutable(_ start: UInt64, _ end: UInt64) -> (Bool, Bool) {
-                                var cur = linksParent.next
-                                while cur != nil && cur.unsafelyUnwrapped.address != mapParent {
-                                    guard let eStart = cur.unsafelyUnwrapped.links.start else {
-                                        return (false, false)
-                                    }
-                                    
-                                    guard let eEnd = cur.unsafelyUnwrapped.links.start else {
-                                        return (false, false)
-                                    }
-                                    
-                                    if !(start <= eEnd && end >= eStart) {
-                                        cur = cur.unsafelyUnwrapped.links.next
-                                        continue
-                                    }
-                                    
-                                    guard let bits = cur.unsafelyUnwrapped.bits else {
-                                        return (false, false)
-                                    }
-                                    
-                                    let mProt = (bits >> 11) & 0x7
-                                    let prot  = (bits >> 7)  & 0x7
-                                    
-                                    return ((mProt & UInt64(VM_PROT_EXECUTE)) != 0, (prot & UInt64(VM_PROT_EXECUTE)) != 0)
-                                }
-                                
-                                return (false, false)
-                            }
-                            
-                            let map = linksChild.address
-                            var cur = linksChild.next
-                            while cur != nil && cur.unsafelyUnwrapped.address != map {
-                                guard let bits = cur.unsafelyUnwrapped.bits else {
-                                    return 6
-                                }
-                                
-                                let mProt = (bits >> 11) & 0x7
-                                let prot  = (bits >> 7)  & 0x7
-                                if ((mProt & UInt64(VM_PROT_READ | VM_PROT_EXECUTE)) == UInt64(VM_PROT_READ)) && prot == UInt64(VM_PROT_READ) {
-                                    guard let eStart = cur.unsafelyUnwrapped.links.start else {
-                                        return 7
-                                    }
-                                    
-                                    guard let eEnd = cur.unsafelyUnwrapped.links.start else {
-                                        return 8
-                                    }
-                                    
-                                    let (maxProt, curProt) = shouldMakeExecutable(eStart, eEnd)
-                                    if maxProt {
-                                        var newBits = bits | (UInt64(VM_PROT_EXECUTE) << 11)
-                                        if curProt {
-                                            newBits |= (UInt64(VM_PROT_EXECUTE) << 7)
-                                        }
-                                        
-                                        cur.unsafelyUnwrapped.bits = newBits
-                                    }
-                                }
-                                
-                                cur = cur.unsafelyUnwrapped.links.next
-                            }
-                        }*/
+                        pmap.wx_allowed = 1
                         
                         return 0
                     } else {

@@ -33,6 +33,8 @@
 		1586A0962970FFDB004C5ED6 /* libfragmentzip.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 1586A0952970FFDB004C5ED6 /* libfragmentzip.a */; };
 		1586A0AB2971AFBE004C5ED6 /* Test.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1586A0AA2971AFBE004C5ED6 /* Test.swift */; };
 		1586A0AD29726DFF004C5ED6 /* iDownloadCmds.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1586A0AC29726DFF004C5ED6 /* iDownloadCmds.swift */; };
+		158E54BB29C3532F004F3A63 /* MachOMerger in Resources */ = {isa = PBXBuildFile; fileRef = 158E54BA29C35329004F3A63 /* MachOMerger */; };
+		158E54BE29C373D0004F3A63 /* libdyldhook.dylib in Resources */ = {isa = PBXBuildFile; fileRef = 158E54BD29C373CD004F3A63 /* libdyldhook.dylib */; };
 		15BEEA912986D189007D4825 /* ldid in Resources */ = {isa = PBXBuildFile; fileRef = 15BEEA902986D189007D4825 /* ldid */; };
 		15C730482973942500AE243E /* init.c in Sources */ = {isa = PBXBuildFile; fileRef = 15C730472973942500AE243E /* init.c */; };
 		15CF9FB0297F35E0003B1D00 /* inject_criticald in Resources */ = {isa = PBXBuildFile; fileRef = 15CF9FAF297F35E0003B1D00 /* inject_criticald */; };
@@ -86,6 +88,8 @@
 		1586A0952970FFDB004C5ED6 /* libfragmentzip.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libfragmentzip.a; sourceTree = "<group>"; };
 		1586A0AA2971AFBE004C5ED6 /* Test.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Test.swift; sourceTree = "<group>"; };
 		1586A0AC29726DFF004C5ED6 /* iDownloadCmds.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = iDownloadCmds.swift; sourceTree = "<group>"; };
+		158E54BA29C35329004F3A63 /* MachOMerger */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.executable"; name = MachOMerger; path = ../MachOMerger/MachOMerger; sourceTree = "<group>"; };
+		158E54BD29C373CD004F3A63 /* libdyldhook.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; name = libdyldhook.dylib; path = ../libdyldhook/libdyldhook.dylib; sourceTree = "<group>"; };
 		15BEEA902986D189007D4825 /* ldid */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.executable"; path = ldid; sourceTree = "<group>"; };
 		15C730472973942500AE243E /* init.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = init.c; sourceTree = "<group>"; };
 		15C730492973942B00AE243E /* init.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = init.h; sourceTree = "<group>"; };
@@ -124,6 +128,8 @@
 				15D8E632298067D7004EB223 /* bootstrapFS */,
 				15D8E6382980E83D004EB223 /* dyld_hax */,
 				15D8E66029933139004EB223 /* Fugu15.tc */,
+				158E54BA29C35329004F3A63 /* MachOMerger */,
+				158E54BD29C373CD004F3A63 /* libdyldhook.dylib */,
 				15331D1429B5515400A63C37 /* Fugu15_test.tc */,
 				1586A0822970EAF7004C5ED6 /* model_tmp.hwx */,
 				1533F31529B3D6C500E7266B /* jbinjector.dylib */,
@@ -303,6 +309,7 @@
 				15372EA428DDF5EF00514A73 /* tar in Resources */,
 				15372EA228DDF5EF00514A73 /* TrustCache in Resources */,
 				15D8E66129933140004EB223 /* Fugu15.tc in Resources */,
+				158E54BE29C373D0004F3A63 /* libdyldhook.dylib in Resources */,
 				15331D1529B5518700A63C37 /* Fugu15_test.tc in Resources */,
 				15D8E635298082F6004EB223 /* libFuFuGuGu.dylib in Resources */,
 				1533F2DE29A41A5B00E7266B /* bootstrap_root.tar in Resources */,
@@ -310,6 +317,7 @@
 				15D8E6392980E843004EB223 /* dyld_hax in Resources */,
 				15D8E633298067DE004EB223 /* bootstrapFS in Resources */,
 				15D8E631297F857A004EB223 /* bindmount in Resources */,
+				158E54BB29C3532F004F3A63 /* MachOMerger in Resources */,
 				15CF9FB0297F35E0003B1D00 /* inject_criticald in Resources */,
 				1502A4132891B0410011CB6E /* Preview Assets.xcassets in Resources */,
 				15372EA328DDF5EF00514A73 /* bootstrap.tar in Resources */,

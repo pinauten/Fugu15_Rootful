@@ -938,20 +938,6 @@ error:
     return err;
 }
 
-int hookFCNTLDyld(void){
-    int err = 0;
-    uint8_t *mh = NULL;
-    uint8_t *strsec = NULL;
-    uint8_t *hooktgt = NULL;
-
-    mh = (uint8_t*)find_dyld_address();
-
-    assure(strsec = memmem(mh, 0xfffffff, "DYLD_INSERT_LIBRARIES", sizeof("DYLD_INSERT_LIBRARIES")));
-    assure(hooktgt = memmem(mh, strsec-mh, DYLD_NEEDLE, sizeof(DYLD_NEEDLE)-1));
-    err = hookAddr(hooktgt, my_fcntl_internal);
-error:
-    return err;
-}
 int csops(pid_t pid, unsigned int  ops, void * useraddr, size_t usersize);
     
     /* code signing attributes of a process */
@@ -1114,7 +1100,6 @@ __attribute__((constructor))  int constructor(){
             return 0;
     #endif
         }
-        //task_set_bootstrap_port(mach_task_self_, MACH_PORT_NULL);
     }
     
     debug("Got JBD Port\n");
@@ -1130,21 +1115,10 @@ __attribute__((constructor))  int constructor(){
     
     csops(getpid(), 0, &realOps, sizeof(int));
     
-    if (giveCSDEBUGToPid(getpid(), 0)){
-#ifndef XCODE
-        debug("Failed to get CSDEBUG\n");
-        return 0;
-#endif
+    if ((realOps & CS_GET_TASK_ALLOW) == 0) {
+        // libdyldhook was apparently unable to give CSDebug to us -> do that now
+        giveCSDEBUGToPid(getpid(), 0);
     }
-    
-    debug("CSDEBUG\n");
-    
-    if (hookFCNTLDyld()){
-        debug("Failed to hook FCNTL dyld\n");
-        return 0;
-    }
-    
-    debug("fcntl\n");
     
     fixupImages();
     

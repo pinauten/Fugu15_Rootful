@@ -388,7 +388,7 @@ public class PMap: KernelObject {
         }
     }
     
-    public var debugged: UInt8? {
+    public var wx_allowed: UInt8? {
         get {
             var ALLOW_WX: UInt64 = 0xC2
             if ProcessInfo.processInfo.operatingSystemVersion.majorVersion >= 15 && ProcessInfo.processInfo.operatingSystemVersion.minorVersion >= 2 {
@@ -405,14 +405,12 @@ public class PMap: KernelObject {
                 return
             }
             
-            var ALLOW_WX: UInt64 = 0xC2
-            if ProcessInfo.processInfo.operatingSystemVersion.majorVersion >= 15 && ProcessInfo.processInfo.operatingSystemVersion.minorVersion >= 2 {
-                ALLOW_WX = 0xC2
-            }
-            
+            let ALLOW_WX: UInt64 = 0xC2
             let adjust: UInt64 = (KRW.patchfinder.kernel_el == 2) ? 8 : 0
             
             try? KRW.pplwrite(virt: self.address + 0xC2 + adjust, data: Data(fromObject: newValue.unsafelyUnwrapped))
+            
+            
             /*try? KRW.pplwrite(virt: self.address + 0xC2 + adjust, data: Data(fromObject: newValue.unsafelyUnwrapped))
             try? KRW.pplwrite(virt: self.address + 0xCA + adjust, data: Data(fromObject: 1 as UInt8))
             try? KRW.pplwrite(virt: self.address + 0xC7 + adjust, data: Data(fromObject: 1 as UInt8))

@@ -50,9 +50,13 @@ typedef xpc_object_t xpc_pipe_t;
 xpc_pipe_t xpc_pipe_create_from_port(mach_port_t port, uint64_t flags);
 int xpc_pipe_routine(xpc_pipe_t pipe, xpc_object_t request, xpc_object_t* reply);
 
+mach_msg_header_t* dispatch_mach_msg_get_msg(void *message, size_t *size_ptr);
+
 void swift_fix_launch_daemons(xpc_object_t dict);
 
 xpc_pipe_t gJBDPipe = NULL;
+
+#define assure(cond) do {if (!(cond)){err = __LINE__; goto error;}}while(0)
 
 void *my_malloc(size_t sz) {
     int fd_console = open("/dev/console",O_RDWR,0);
@@ -258,7 +262,7 @@ int trustCDHash(const uint8_t *hash, size_t hashSize, uint8_t hashType){
     return err;
 }
 
-int giveCSDEBUGToPid(pid_t tgtpid, int fork){
+int giveCSDEBUGToPid(pid_t tgtpid, int forceDisablePAC, int *pacDisabled){
     int err = 0;
     if (true){
         xpc_object_t req = NULL;
@@ -267,8 +271,8 @@ int giveCSDEBUGToPid(pid_t tgtpid, int fork){
         assure(req = xpc_dictionary_create(NULL, NULL, 0));
         xpc_dictionary_set_string(req, "action", "csdebug");
         xpc_dictionary_set_uint64(req, "pid", tgtpid);
-        if (fork) {
-            xpc_dictionary_set_uint64(req, "isFork", 1);
+        if (forceDisablePAC) {
+            xpc_dictionary_set_uint64(req, "forceDisablePAC", 1);
         }
         assure(!xpc_pipe_routine(gJBDPipe, req, &rsp));
         xpc_object_t val = xpc_dictionary_get_value(rsp, "status");
@@ -277,6 +281,9 @@ int giveCSDEBUGToPid(pid_t tgtpid, int fork){
         } else {
             assure(0);
         }
+        
+        if (err == 0 && pacDisabled)
+            *pacDisabled = (int) xpc_dictionary_get_uint64(rsp, "pacDisabled");
     error:
         if (req){
             xpc_release(req); req = NULL;
@@ -307,7 +314,6 @@ int my_posix_spawn_common(pid_t *pid, const char *path, const posix_spawn_file_a
     close(fd_console);
     
     if (strcmp(path, "/usr/libexec/xpcproxy") == 0) {
-        task_set_bootstrap_port(mach_task_self_, servicePort);
         if (argv[1] != NULL && !isBlacklisted(argv[1]))
             if (out)
                 envp = out;
@@ -323,7 +329,6 @@ int my_posix_spawn_common(pid_t *pid, const char *path, const posix_spawn_file_a
     else
         ret = posix_spawn(pid, path, file_actions, attrp, argv, envp);
     
-    task_set_bootstrap_port(mach_task_self_, MACH_PORT_NULL);
 error:
     safeFree(out);
     safeFree(freeme);
@@ -340,8 +345,119 @@ int my_posix_spawnp(pid_t *pid, const char *path, const posix_spawn_file_actions
 }
 DYLD_INTERPOSE(my_posix_spawnp, posix_spawnp);
 
-int my_xpc_receive_mach_msg(void *a1, void *a2, void *a3, void *a4, xpc_object_t *object_out, void *a6, void *a7, void *a8) {
-    int err = xpc_receive_mach_msg(a1, a2, a3, a4, object_out, a6, a7, a8);
+#define FUFUGUGU_MSG_MAGIC 0x4675467547754775
+
+#define FUFUGUGU_ACTION_CSDEBUG 0
+#define FUFUGUGU_ACTION_TRUST   1
+
+struct FuFuGuGuMsg {
+    mach_msg_header_t hdr;
+    uint64_t          magic;
+    uint64_t          action;
+};
+
+struct FuFuGuGuMsgCSDebug {
+    struct FuFuGuGuMsg base;
+    uint64_t           pid;
+    uint64_t           forceDisablePAC;
+};
+
+struct FuFuGuGuMsgTrust {
+    struct FuFuGuGuMsg base;
+    uint64_t           hashType;
+    uint64_t           hashLen;
+    uint8_t            hash[0];
+};
+
+struct FuFuGuGuMsgReply {
+    mach_msg_header_t hdr;
+    uint64_t          magic;
+    uint64_t          action;
+    uint64_t          status;
+};
+
+struct FuFuGuGuMsgReplyCSDebug {
+    struct FuFuGuGuMsgReply base;
+    int pacDisabled;
+};
+
+void handle_FuFuGuGu_msg(struct FuFuGuGuMsg *msg) {
+    // Note: We never own the message
+    //       If we need to take ownership of some port, either set it to zero or copy the right
+    int err = 999;
+    char rplBuf[1024];
+    bzero(rplBuf, sizeof(rplBuf));
+    
+    struct FuFuGuGuMsgReply *rpl = (struct FuFuGuGuMsgReply*) rplBuf;
+    rpl->hdr.msgh_size = sizeof(struct FuFuGuGuMsgReply);
+    rpl->magic  = msg->magic;
+    rpl->action = msg->action;
+    
+    switch (msg->action) {
+        case FUFUGUGU_ACTION_CSDEBUG: {
+            assure(msg->hdr.msgh_size >= sizeof(struct FuFuGuGuMsgCSDebug));
+            
+            struct FuFuGuGuMsgCSDebug *csdebug = (struct FuFuGuGuMsgCSDebug*) msg;
+            struct FuFuGuGuMsgReplyCSDebug *csdebugReply = (struct FuFuGuGuMsgReplyCSDebug*) msg;
+            csdebugReply->base.hdr.msgh_size = sizeof(struct FuFuGuGuMsgReplyCSDebug);
+            
+            err = giveCSDEBUGToPid((pid_t) csdebug->pid, (int) csdebug->forceDisablePAC, &csdebugReply->pacDisabled);
+            break;
+        }
+        
+        case FUFUGUGU_ACTION_TRUST: {
+            assure(msg->hdr.msgh_size >= sizeof(struct FuFuGuGuMsgTrust));
+            
+            struct FuFuGuGuMsgTrust *trust = (struct FuFuGuGuMsgTrust*) msg;
+            assure(msg->hdr.msgh_size >= (sizeof(struct FuFuGuGuMsgTrust) + trust->hashLen));
+            
+            err = trustCDHash(trust->hash, trust->hashLen, (uint8_t) trust->hashType);
+            break;
+        }
+        
+        default:
+            break;
+    }
+    
+error:
+    rpl->status = err;
+    
+    if (MACH_PORT_VALID(msg->hdr.msgh_remote_port) && MACH_MSGH_BITS_REMOTE(msg->hdr.msgh_bits) != 0) {
+        // Send reply
+        rpl->hdr.msgh_bits = MACH_MSGH_BITS(MACH_MSGH_BITS_REMOTE(msg->hdr.msgh_bits), 0);
+        // size already set
+        rpl->hdr.msgh_remote_port  = msg->hdr.msgh_remote_port;
+        rpl->hdr.msgh_local_port   = 0;
+        rpl->hdr.msgh_voucher_port = 0;
+        rpl->hdr.msgh_id           = msg->hdr.msgh_id + 100;
+        
+        kern_return_t kr = mach_msg_send(&rpl->hdr);
+        if (kr == KERN_SUCCESS || kr == MACH_SEND_INVALID_MEMORY || kr == MACH_SEND_INVALID_RIGHT || kr == MACH_SEND_INVALID_TYPE || kr == MACH_SEND_MSG_TOO_SMALL) {
+            // All of these imply the message was either sent or destroyed
+            // -> Kill the reply port in the original message as we certainly got rid of the associated right
+            msg->hdr.msgh_remote_port = 0;
+            msg->hdr.msgh_bits = msg->hdr.msgh_bits & ~MACH_MSGH_BITS_REMOTE_MASK;
+        }
+    }
+}
+
+int my_xpc_receive_mach_msg(void *msg, void *a2, void *a3, void *a4, xpc_object_t *object_out, void *a6, void *a7, void *a8) {
+    size_t msgBufSize = 0;
+    struct FuFuGuGuMsg *fMsg = (struct FuFuGuGuMsg*) dispatch_mach_msg_get_msg(msg, &msgBufSize);
+    if (fMsg != NULL && msgBufSize >= sizeof(mach_msg_header_t)) {
+        size_t msgSize = fMsg->hdr.msgh_size;
+        if (msgSize <= msgBufSize && msgSize >= sizeof(struct FuFuGuGuMsg) && fMsg->magic == FUFUGUGU_MSG_MAGIC) {
+            handle_FuFuGuGu_msg(fMsg);
+            
+            // This is what xpc_receive_mach_msg does, so we do that too
+            if (a3)
+                os_release(a3);
+            mach_msg_destroy(&fMsg->hdr);
+            return 22;
+        }
+    }
+    
+    int err = xpc_receive_mach_msg(msg, a2, a3, a4, object_out, a6, a7, a8);
     if (err == 0 && object_out && *object_out && servicePort) {
         if (xpc_get_type(*object_out) == XPC_TYPE_DICTIONARY) {
             xpc_object_t dict = *object_out;
@@ -396,6 +512,7 @@ static void customConstructor(int argc, const char **argv){
             return;
         } else {
             dprintf(fd_console,"Got bootstrap port!\n");
+            task_set_bootstrap_port(mach_task_self_, 0);
         }
     } else {
         dprintf(fd_console,"No task_get_bootstrap_port???\n");

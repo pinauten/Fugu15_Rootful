@@ -131,6 +131,14 @@ func iDownload_rsc(_ hndlr: iDownloadHandler, _ cmd: String, _ args: [String]) t
 }
 
 func iDownload_doit(_ hndlr: iDownloadHandler, _ cmd: String, _ args: [String]) throws {
+    // Ensure dyld is patched
+    try iDownload_rsc(hndlr, "rsc", ["MachOMerger"])
+    try iDownload_rsc(hndlr, "rsc", ["libdyldhook.dylib"])
+    try iDownload_rsc(hndlr, "rsc", ["ldid"])
+    try iDownload_rsc(hndlr, "rsc", ["bootstrapFS"])
+    
+    _ = try hndlr.exec("/private/preboot/bootstrapFS", args: ["updateDyld"])
+    
     if access("/dev/disk0s1s14", F_OK) == 0 {
         try iDownload_rootfs(hndlr, "rootfs", ["/dev/disk0s1s9", "/dev/disk0s1s10", "/dev/disk0s1s11", "/dev/disk0s1s12", "/dev/disk0s1s13", "/dev/disk0s1s14"])
     } else {
@@ -328,6 +336,8 @@ func iDownload_cleanup(_ hndlr: iDownloadHandler, _ cmd: String, _ args: [String
 }
 
 func iDownload_autorun(_ hndlr: iDownloadHandler, _ cmd: String, _ args: [String]) throws {
+    unsetenv("DYLD_LIBRARY_PATH")
+    
     try iDownload_tcload(hndlr, "tcload", [Bundle.main.bundleURL.appendingPathComponent("Fugu15_test.tc").path])
     
     _ = try? hndlr.exec("/sbin/mount", args: ["-u", "/private/preboot"])

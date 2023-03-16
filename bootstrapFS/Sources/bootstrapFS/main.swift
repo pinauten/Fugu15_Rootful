@@ -7,7 +7,7 @@
 
 import Foundation
 
-func ensureFuguPartition(name: String, realPath: String, rootfs: String) throws -> String {
+func ensureFuguPartition(name: String, realPath: String, rootfs: String, forcePatch: Bool = false) throws -> String {
     // First get or create our volume
     var (device, created) = try findOrCreateVolume(name: name)
     print("\(name): \(device) created: \(created)")
@@ -34,6 +34,12 @@ func ensureFuguPartition(name: String, realPath: String, rootfs: String) throws 
             
             // Remount
             mp = try mount(volume: device)
+        } else if forcePatch && name == "Fugu15Usr" {
+            // Force dyld patch
+            unlink(mp + "/usr/lib/dyld")
+            try patchDYLD(real: "/usr/lib/dyld", patched: mp + "/lib/dyld", trustCache: mp + "/.Fugu15/TrustCache")
+            
+            return "/dev/" + device
         } else {
             // Otherwise, we are done!
             print("Partition \(name) already prepared")
@@ -95,6 +101,12 @@ func main() throws {
 #endif
 
 do {
+    if CommandLine.arguments.count >= 2 && CommandLine.arguments[1] == "updateDyld" {
+        // Only patch dyld
+        _ = try ensureFuguPartition(name: "Fugu15Usr", realPath: "/usr", rootfs: "/", forcePatch: true)
+        exit(0)
+    }
+    
     try main()
     exit(0)
 } catch let e {
