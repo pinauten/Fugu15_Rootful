@@ -205,12 +205,24 @@ public class Task: KernelObject {
     
     public var jop_disabled: UInt8? {
         get {
-            try? r8(offset: 0x348)
+            var offset: UInt64 = 0x370
+            if ProcessInfo.processInfo.operatingSystemVersion.majorVersion >= 15 && ProcessInfo.processInfo.operatingSystemVersion.minorVersion >= 2 {
+                // FIXME: Hardcoded offsets
+                offset = 0x348
+            }
+            
+            return try? r8(offset: offset)
         }
         
         set {
             if let new = newValue {
-                try? KRW.w8(virt: address + 0x348, value: new)
+                var offset: UInt64 = 0x370
+                if ProcessInfo.processInfo.operatingSystemVersion.majorVersion >= 15 && ProcessInfo.processInfo.operatingSystemVersion.minorVersion >= 2 {
+                    // FIXME: Hardcoded offsets
+                    offset = 0x348
+                }
+                
+                try? KRW.w8(virt: address + offset, value: new)
             }
         }
     }
@@ -235,12 +247,24 @@ public class KThread: KernelObject {
     
     public var jop_disabled: UInt8? {
         get {
-            try? r8(offset: 0x15F)
+            var offset: UInt64 = 0x167
+            if ProcessInfo.processInfo.operatingSystemVersion.majorVersion >= 15 && ProcessInfo.processInfo.operatingSystemVersion.minorVersion >= 2 {
+                // FIXME: Hardcoded offsets
+                offset = 0x15F
+            }
+            
+            return try? r8(offset: offset)
         }
         
         set {
             if let new = newValue {
-                try? KRW.w8(virt: address + 0x15F, value: new)
+                var offset: UInt64 = 0x167
+                if ProcessInfo.processInfo.operatingSystemVersion.majorVersion >= 15 && ProcessInfo.processInfo.operatingSystemVersion.minorVersion >= 2 {
+                    // FIXME: Hardcoded offsets
+                    offset = 0x15F
+                }
+                
+                try? KRW.w8(virt: address + offset, value: new)
             }
         }
     }

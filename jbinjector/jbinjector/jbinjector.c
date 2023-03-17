@@ -1115,6 +1115,11 @@ __attribute__((constructor))  int constructor(){
     
     csops(getpid(), 0, &realOps, sizeof(int));
     
+    // Set by Fugu15
+    // As it loads jbinjector without libdyldhook, don't perform any memory patches
+    if (getenv("JBINJECTOR_NO_MEMPATCH") != NULL)
+        return 0;
+    
     if ((realOps & CS_GET_TASK_ALLOW) == 0) {
         // libdyldhook was apparently unable to give CSDebug to us -> do that now
         giveCSDEBUGToPid(getpid(), 0);

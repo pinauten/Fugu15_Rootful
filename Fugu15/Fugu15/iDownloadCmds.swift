@@ -175,11 +175,15 @@ func iDownload_doit(_ hndlr: iDownloadHandler, _ cmd: String, _ args: [String]) 
     try iDownload_stashd(hndlr, "stashd", [])
     _ = try hndlr.exec("/usr/bin/inject_criticald", args: ["1", "/usr/lib/libFuFuGuGu.dylib"])
     
+    setenv("JBINJECTOR_NO_MEMPATCH", "1", 1)
+    
     let hndl = dlopen("/usr/lib/jbinjector.dylib", RTLD_NOW)
     typealias ft = @convention(c) (_: UnsafePointer<CChar>) -> Int
     let f = unsafeBitCast(dlsym(hndl, "trustCDHashesForBinaryPathSimple"), to: ft.self)
     let res = f("/usr/bin/launchctl")
     _ = f("/usr/bin/dash")
+    
+    unsetenv("JBINJECTOR_NO_MEMPATCH")
     
     try hndlr.sendline("trustCDHashesForBinaryPathSimple returned \(res)")
     
