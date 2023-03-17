@@ -216,6 +216,55 @@ func handleXPC(request: XPCDict, reply: XPCDict) -> UInt64 {
                 return 1
             }
             
+        case "fixpermanent":
+            if let pid = request["pid"] as? UInt64 {
+                if let start = request["start"] as? UInt64 {
+                    if let len = request["len"] as? UInt64 {
+                        let end = start + len
+                        if let proc = try? Proc(pid: pid_t(pid)) {
+                            guard let links = proc.task?.vmMap?.links else {
+                                return 5
+                            }
+                            
+                            let map = links.address
+                            var cur = links.next
+                            while cur != nil && cur.unsafelyUnwrapped.address != map {
+                                guard let eStart = cur.unsafelyUnwrapped.start else {
+                                    return 5
+                                }
+                                
+                                guard let eEnd = cur.unsafelyUnwrapped.start else {
+                                    return 6
+                                }
+                                
+                                guard start <= eEnd && end >= eStart else {
+                                    cur = cur.unsafelyUnwrapped.next
+                                    continue
+                                }
+                                
+                                guard let bits = cur.unsafelyUnwrapped.bits else {
+                                    return 7
+                                }
+                                
+                                cur.unsafelyUnwrapped.bits = bits & ~(1 << 19)
+                                
+                                cur = cur.unsafelyUnwrapped.next
+                            }
+                            
+                            return 0
+                        } else {
+                            return 4
+                        }
+                    } else {
+                        return 3
+                    }
+                } else {
+                    return 2
+                }
+            } else {
+                return 1
+            }
+            
         default:
             break
         }

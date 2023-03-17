@@ -136,6 +136,8 @@ int my_sandbox_check_by_audit_token(audit_token_t au, const char *operation, int
                 if (!isTokenBlacklisted(au)) {
                   return 0;
                 }
+            } else if (strcmp(name, "com.apple.nfcd.hwmanager") == 0) {
+                return 0;
             }
         }
     }
@@ -473,7 +475,7 @@ void handle_FuFuGuGu_msg(struct FuFuGuGuMsg *msg) {
             xpc_array_append_value(startAr, start);
             xpc_array_append_value(endAr, end);
             
-            err = fixprot(fixprotMsg->pid, startAr, endAr, 0);
+            err = fixprot((pid_t) fixprotMsg->pid, startAr, endAr, 0);
             
             xpc_release(endAr);
             xpc_release(startAr);

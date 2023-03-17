@@ -229,6 +229,29 @@ int fixprot(pid_t pid, xpc_object_t start, xpc_object_t end, uint64_t forceExec)
     return err;
 }
 
+int fixpermanent(pid_t pid, uint64_t start, size_t len) {
+    int err = 0;
+    if (gJBDPipe){
+        xpc_object_t req = NULL;
+        xpc_object_t rsp = NULL;
+        assure(req = xpc_dictionary_create(NULL, NULL, 0));
+        xpc_dictionary_set_string(req, "action", "fixpermanent");
+        xpc_dictionary_set_uint64(req, "pid", pid);
+        xpc_dictionary_set_uint64(req, "start", start);
+        xpc_dictionary_set_uint64(req, "len", len);
+        assure(!xpc_pipe_routine(gJBDPipe, req, &rsp));
+        err = (int)xpc_dictionary_get_uint64(rsp, "status");
+    error:
+        if (req){
+            xpc_release(req); req = NULL;
+        }
+        if (rsp){
+            xpc_release(rsp); rsp = NULL;
+        }
+    }
+    return err;
+}
+
 int sbtoken(const char *path, int rw) {
     int err = 0;
     if (gJBDPipe){
@@ -1107,6 +1130,20 @@ error:
     return err;
 }
     
+int notifyDYLDHookFixupsDone(void) {
+    int err = 0;
+    uint8_t *mh = NULL;
+    uint8_t *strsec = NULL;
+    uint8_t *hooktgt = NULL;
+
+    mh = (uint8_t*)find_dyld_address();
+
+    assure(strsec = memmem(mh, 0xfffffff, "LIBDYLDHOOK_NOTIFY_FIXUPS_DONE", sizeof("LIBDYLDHOOK_NOTIFY_FIXUPS_DONE")));
+    strsec[0] = 1;
+error:
+    return err;
+}
+    
 #ifdef XCODE
 int main(int argc, const char * argv[], const char **envp) {
 #else
@@ -1171,6 +1208,7 @@ __attribute__((constructor))  int constructor(){
     }
     
     fixupImages();
+    notifyDYLDHookFixupsDone();
     
     debug("images\n");
     

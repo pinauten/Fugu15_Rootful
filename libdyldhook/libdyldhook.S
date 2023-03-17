@@ -39,6 +39,8 @@ MAKE_TRAMPOLINE(task_self_trap)
 MAKE_TRAMPOLINE(__stack_chk_fail)
 MAKE_TRAMPOLINE_ALIAS(_kernelrpc_mach_vm_allocate_trap, vm_allocate)
 MAKE_TRAMPOLINE_ALIAS(_kernelrpc_mach_vm_deallocate_trap, vm_deallocate)
+MAKE_TRAMPOLINE(vm_protect)
+MAKE_TRAMPOLINE(memcpy)
 
 DEF_SYSCALL(read, 3)
 DEF_SYSCALL(lseek, 199)

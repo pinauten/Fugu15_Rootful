@@ -26,6 +26,14 @@ kern_return_t fufuguguRequest(struct FuFuGuGuMsg *msg, struct FuFuGuGuMsgReply *
 mach_port_t gReplyPort = 0;
 mach_port_t gBootstrapPort = 0;
 
+uint8_t fixupsDone[] = {
+    // "LIBDYLDHOOK_NOTIFY_FIXUPS_DONE"
+    0x4c, 0x49, 0x42, 0x44, 0x59, 0x4c, 0x44, 0x48,
+    0x4f, 0x4f, 0x4b, 0x5f, 0x4e, 0x4f, 0x54, 0x49,
+    0x46, 0x59, 0x5f, 0x46, 0x49, 0x58, 0x55, 0x50,
+    0x53, 0x5f, 0x44, 0x4f, 0x4e, 0x45, 0x00
+};
+
 mach_port_t mig_get_reply_port(void) {
     if (!gReplyPort) {
         gReplyPort = mach_reply_port();
@@ -167,6 +175,11 @@ void pfree(void *ptr) {
     vm_deallocate(task_self_trap(), (vm_address_t) ptr, 0x4000);
 }
 
+// Tell mmap hook to force fix the next executable section
+// This is set if attaching signatures failed
+// Dylibs only have on executable segment and mmap is called directly after fcntl
+int forceFixNext = 0;
+
 int HOOK(__fcntl)(int fd, int cmd, void *arg1, void *arg2, void *arg3, void *arg4, void *arg5, void *arg6, void *arg7, void *arg8) {
     int hideErrors = 0;
     switch (cmd){
@@ -207,6 +220,8 @@ int HOOK(__fcntl)(int fd, int cmd, void *arg1, void *arg2, void *arg3, void *arg
             siginfo->fs_file_start = -1;
         }
         
+        forceFixNext = 1;
+        
         return 0;
     }
     
@@ -214,12 +229,32 @@ int HOOK(__fcntl)(int fd, int cmd, void *arg1, void *arg2, void *arg3, void *arg
 }
 
 void* HOOK(__mmap)(void *addr, size_t len, int prot, int flags, int fd, off_t pos) {
+    int shouldFix = 0;
     void *res = (void*) msyscall_errno(0xC5, addr, len, prot, flags, fd, pos);
-    if (res == MAP_FAILED && (prot & VM_PROT_EXECUTE)) {
-        res = (void*) msyscall_errno(0xC5, addr, len, prot & ~(VM_PROT_WRITE | VM_PROT_EXECUTE), flags, fd, pos);
-        if (res != MAP_FAILED) {
+    if (res == MAP_FAILED) {
+        res = (void*) msyscall_errno(0xC5, addr, len, (prot & ~(VM_PROT_EXECUTE)) | VM_PROT_WRITE, flags, fd, pos);
+        
+        // We mapped this r/w, force the mapping to be fixed
+        shouldFix = 1;
+    } else if (prot & VM_PROT_EXECUTE && forceFixNext) {
+        // If this should have been mapped executable and we succeded,
+        // but we know the signature is invalid, force this to be fixed
+        // This will incur a performance penalty
+        forceFixNext = 0;
+        shouldFix = 1;
+    }
+    
+    if (res != MAP_FAILED && shouldFix) {
+        // However, we only fix if jbinjector is done
+        // If it didn't run yet, do nothing - jbinjector will fix this mapping for us
+        // jbinjector is faster because it can fix multiple images in a single request
+        if (fixupsDone[0] == 1) {
             fixprotSingle(getpid(), res, len);
-            vm_protect(task_self_trap(), (uintptr_t) res, len, 0, VM_PROT_READ | VM_PROT_EXECUTE);
+            
+            if ((prot & (VM_PROT_WRITE | VM_PROT_EXECUTE)) == (VM_PROT_WRITE | VM_PROT_EXECUTE))
+                prot &= ~VM_PROT_WRITE;
+            
+            vm_protect(task_self_trap(), (uintptr_t) res, len, 0, prot);
         }
     }
     
