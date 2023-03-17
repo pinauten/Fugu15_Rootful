@@ -54,14 +54,35 @@ public class Proc: KernelObject {
             throw KRWError.patchfinderFailed(symbol: "allproc")
         }
         
-        var curProc = try KRW.slide(virt: allproc)
-        while curProc != 0 {
-            if try KRW.r32(virt: curProc &+ 0x68 /* PROC_PID */) == pid {
-                self.init(address: curProc)
-                return
-            }
-            
-            curProc = try KRW.rPtr(virt: curProc)
+        // Try up to five times
+        // XXX: This is ugly
+        for i in 0..<5 {
+            do {
+                var curProc = try KRW.slide(virt: allproc)
+                while curProc != 0 {
+                    let off = Int(curProc & 0x3FFF)
+                    let pg  = curProc & ~0x3FFF
+                    guard let physAddr = try? KRW.kvtophys(kv: pg) else {
+                        return nil
+                    }
+                    
+                    let window = PPLRW.getWindow()
+                    let res = window.performWithMapping(to: physAddr) { ptr -> UInt64? in
+                        if ptr.advanced(by: off &+ 0x68 /* PROC_PID */).assumingMemoryBound(to: UInt32.self).pointee == pid {
+                            return nil
+                        }
+                        
+                        return ptr.advanced(by: off).assumingMemoryBound(to: UInt64.self).pointee | 0xFFFFFF8000000000
+                    }
+                    
+                    if res == nil {
+                        self.init(address: curProc)
+                        return
+                    }
+                    
+                    curProc = res.unsafelyUnwrapped
+                }
+            } catch { }
         }
         
         return nil
