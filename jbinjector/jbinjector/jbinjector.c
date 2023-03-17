@@ -64,6 +64,7 @@ extern int sandbox_extension_consume(const char *token);
 
 xpc_pipe_t gJBDPipe  = NULL;
 mach_port_t gJBDPort = MACH_PORT_NULL;
+int disableSpawnInterpose = 0;
 
 #ifdef DEBUG
 #define debug(a...) printf(a)
@@ -88,11 +89,13 @@ __attribute__ ((section ("__DATA,__interpose"))) = { (const void*)(unsigned long
 #define INJECT_VALUE2 "0xff"
 
 #ifdef __aarch64__
+#define POSIX_SPAWN_NEEDLE "\x90\x1E\x80\xD2\x01\x10\x00\xD4"
 #define EXECVE_NEEDLE "\x70\x07\x80\xD2\x01\x10\x00\xD4"
 #define FORK_NEEDLE "\x50\x00\x80\xD2\x01\x10\x00\xD4"
 #define DYLD_NEEDLE "\x90\x0B\x80\xD2\x01\x10\x00\xD4"
 #define DYLD_PATCH "\x50\x00\x00\x58\x00\x02\x1F\xD6"
 #else
+#define POSIX_SPAWN_NEEDLE "\x70\x07\x80\xD2\x01\x10\x00\xD4" //WRONG!!!
 #define EXECVE_NEEDLE "\x70\x07\x80\xD2\x01\x10\x00\xD4" //WRONG!!!
 #define FORK_NEEDLE "\xB8\x02\x00\x00\x02\x0F\x05"
 #define DYLD_NEEDLE "\xB8\x5C\x00\x00\x02\x49\x89\xCA\x0F\x05"
@@ -524,7 +527,7 @@ int my_posix_spawn(pid_t *pid, const char *path, const posix_spawn_file_actions_
     int ret = 0;
     char **out = NULL;
     char *freeme = NULL;
-    if (gJBDPipe){
+    if (gJBDPipe && !disableSpawnInterpose){
         trustCDHashesForBinaryPathSimple(path);
         if (!isBlacklisted(path)) {
             injectDylibToEnvVars(envp, &out, &freeme);
@@ -544,7 +547,7 @@ int my_posix_spawnp(pid_t *pid, const char *path, const posix_spawn_file_actions
     int ret = 0;
     char **out = NULL;
     char *freeme = NULL;
-    if (gJBDPipe){
+    if (gJBDPipe && !disableSpawnInterpose){
         trustCDHashesForBinaryPathSimple(path);
         if (!isBlacklisted(path)) {
             injectDylibToEnvVars(envp, &out, &freeme);
@@ -616,6 +619,7 @@ pid_t my_fork_internal(void){
     
 int hookFork(void);
 int hookExecve(void);
+int hookPosixSpawn(void);
     
 mach_port_t recvPort(mach_port_t from) {
     struct {
@@ -1062,6 +1066,47 @@ error:
     return err;
 }
     
+int my_posix_spawn_internal(pid_t *pid, const char *path, void *adesc, char **argv, char **envp) {
+    int ret = 0;
+    char **out = NULL;
+    char *freeme = NULL;
+    if (gJBDPipe){
+        trustCDHashesForBinaryPathSimple(path);
+        if (!isBlacklisted(path)) {
+            injectDylibToEnvVars(envp, &out, &freeme);
+            envp = out;
+        }
+    }
+    
+    ret = (int) msyscall_errno(0xF4, pid, path, adesc, argv, envp);
+error:
+    safeFree(out);
+    safeFree(freeme);
+    return ret;
+}
+    
+int hookPosixSpawn(void){
+    int err = 0;
+    uint8_t *hooktgt = NULL;
+    
+    debug("hookPosixSpawn\n");
+    uint8_t *nearbyLoc = (uint8_t*)ptrauth_strip((void*) mach_ports_register, 0);
+    size_t searchSize = PAGE_SIZE*10;
+
+    hooktgt = memmem(nearbyLoc, searchSize, POSIX_SPAWN_NEEDLE, sizeof(POSIX_SPAWN_NEEDLE)-1);
+    debug("memmem 1 alive\n");
+    if (!hooktgt){
+        hooktgt = memmem(nearbyLoc-searchSize, searchSize, POSIX_SPAWN_NEEDLE, sizeof(POSIX_SPAWN_NEEDLE)-1);
+        debug("memmem 2 alive\n");
+    }
+    assure(hooktgt);
+    debug("found posix_spawn hook needle\n");
+    err = hookAddr(hooktgt, my_posix_spawn_internal);
+error:
+    debug("hookPosixSpawn err=%d\n",err);
+    return err;
+}
+    
 #ifdef XCODE
 int main(int argc, const char * argv[], const char **envp) {
 #else
@@ -1147,6 +1192,10 @@ __attribute__((constructor))  int constructor(){
     int err = proc_pidpath(getpid(), pathbuf, sizeof(pathbuf));
     if (err >= 0) {
         if (strstr(pathbuf, "xpcproxy") == NULL && !isBlacklisted(pathbuf)) {
+            debug("Will also hook posix_spawn\n");
+            if (!hookPosixSpawn())
+                disableSpawnInterpose = 1;
+            
             debug("Issuing sandbox extensions...\n");
             sbtoken("/Library", 0);
             sbtoken("/private/var/mobile/Library", 0);
