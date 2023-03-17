@@ -295,6 +295,32 @@ int giveCSDEBUGToPid(pid_t tgtpid, int forceDisablePAC, int *pacDisabled){
     return err;
 }
 
+int fixprot(pid_t pid, xpc_object_t start, xpc_object_t end, uint64_t forceExec) {
+    int err = 0;
+    if (gJBDPipe){
+        xpc_object_t req = NULL;
+        xpc_object_t rsp = NULL;
+        assure(req = xpc_dictionary_create(NULL, NULL, 0));
+        xpc_dictionary_set_string(req, "action", "fixprot");
+        xpc_dictionary_set_uint64(req, "pid", pid);
+        xpc_dictionary_set_value(req, "start", start);
+        xpc_dictionary_set_value(req, "end", end);
+        if (forceExec) {
+            xpc_dictionary_set_uint64(req, "forceExec", 1);
+        }
+        assure(!xpc_pipe_routine(gJBDPipe, req, &rsp));
+        err = (int)xpc_dictionary_get_uint64(rsp, "status");
+    error:
+        if (req){
+            xpc_release(req); req = NULL;
+        }
+        if (rsp){
+            xpc_release(rsp); rsp = NULL;
+        }
+    }
+    return err;
+}
+
 int my_posix_spawn_common(pid_t *pid, const char *path, const posix_spawn_file_actions_t *file_actions, const posix_spawnattr_t *attrp, char *const argv[], char *const envp[], int is_spawnp){
     int fd_console = open("/dev/console",O_RDWR,0);
     dprintf(fd_console, "spawning %s", path);
@@ -302,6 +328,16 @@ int my_posix_spawn_common(pid_t *pid, const char *path, const posix_spawn_file_a
         dprintf(fd_console, " %s", argv[i]);
     }
     
+    if (attrp) {
+        short flags = 0;
+        posix_spawnattr_getflags(attrp, &flags);
+        if (flags & POSIX_SPAWN_SETEXEC) {
+            // launchd re-execing itself
+            // Call our hook instead
+            my_kill(-1, SIGKILL);
+            return -1;
+        }
+    }
     
     int ret = 0;
     char **out = NULL;
@@ -347,8 +383,9 @@ DYLD_INTERPOSE(my_posix_spawnp, posix_spawnp);
 
 #define FUFUGUGU_MSG_MAGIC 0x4675467547754775
 
-#define FUFUGUGU_ACTION_CSDEBUG 0
-#define FUFUGUGU_ACTION_TRUST   1
+#define FUFUGUGU_ACTION_CSDEBUG        0
+#define FUFUGUGU_ACTION_TRUST          1
+#define FUFUGUGU_ACTION_FIXPROT_SINGLE 2
 
 struct FuFuGuGuMsg {
     mach_msg_header_t hdr;
@@ -367,6 +404,13 @@ struct FuFuGuGuMsgTrust {
     uint64_t           hashType;
     uint64_t           hashLen;
     uint8_t            hash[0];
+};
+
+struct FuFuGuGuMsgFixprotSingle {
+    struct FuFuGuGuMsg base;
+    uint64_t           pid;
+    void               *address;
+    size_t             size;
 };
 
 struct FuFuGuGuMsgReply {
@@ -412,6 +456,29 @@ void handle_FuFuGuGu_msg(struct FuFuGuGuMsg *msg) {
             assure(msg->hdr.msgh_size >= (sizeof(struct FuFuGuGuMsgTrust) + trust->hashLen));
             
             err = trustCDHash(trust->hash, trust->hashLen, (uint8_t) trust->hashType);
+            break;
+        }
+            
+        case FUFUGUGU_ACTION_FIXPROT_SINGLE: {
+            assure(msg->hdr.msgh_size >= sizeof(struct FuFuGuGuMsgFixprotSingle));
+            
+            struct FuFuGuGuMsgFixprotSingle *fixprotMsg = (struct FuFuGuGuMsgFixprotSingle*) msg;
+            
+            xpc_object_t start = xpc_uint64_create((uint64_t) fixprotMsg->address);
+            xpc_object_t end = xpc_uint64_create((uint64_t) fixprotMsg->address + fixprotMsg->size);
+            
+            xpc_object_t startAr = xpc_array_create(NULL, 0);
+            xpc_object_t endAr   = xpc_array_create(NULL, 0);
+            
+            xpc_array_append_value(startAr, start);
+            xpc_array_append_value(endAr, end);
+            
+            err = fixprot(fixprotMsg->pid, startAr, endAr, 0);
+            
+            xpc_release(endAr);
+            xpc_release(startAr);
+            xpc_release(end);
+            xpc_release(start);
             break;
         }
         

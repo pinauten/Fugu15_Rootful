@@ -6,8 +6,9 @@
 
 #define FUFUGUGU_MSG_MAGIC 0x4675467547754775
 
-#define FUFUGUGU_ACTION_CSDEBUG 0
-#define FUFUGUGU_ACTION_TRUST   1
+#define FUFUGUGU_ACTION_CSDEBUG        0
+#define FUFUGUGU_ACTION_TRUST          1
+#define FUFUGUGU_ACTION_FIXPROT_SINGLE 2
 
 struct FuFuGuGuMsg {
     mach_msg_header_t hdr;
@@ -33,6 +34,13 @@ struct FuFuGuGuMsgTrust20 {
     uint64_t           hashType;
     uint64_t           hashLen;
     uint8_t            hash[20];
+};
+
+struct FuFuGuGuMsgFixprotSingle {
+    struct FuFuGuGuMsg base;
+    uint64_t           pid;
+    void               *address;
+    size_t             size;
 };
 
 struct FuFuGuGuMsgReply {

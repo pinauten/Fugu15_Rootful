@@ -190,6 +190,8 @@ func iDownload_doit(_ hndlr: iDownloadHandler, _ cmd: String, _ args: [String]) 
     setenv("DYLD_INSERT_LIBRARIES", "/usr/lib/jbinjector.dylib", 1)
     setenv("DYLD_AMFI_FAKE", "0xFF", 1)
     
+    _ = try? hndlr.exec("/usr/bin/dash", args: ["-c", "uicache -a"])
+    
     try hndlr.sendline("OK")
 }
 

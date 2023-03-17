@@ -15,6 +15,8 @@
 #define safePFree(buf) do{if ((buf)){pfree(buf); buf = NULL;}}while(0)
 #define assure(cond) do {if (!(cond)){err = __LINE__; goto error;}}while(0)
 
+#define MAP_FAILED ((void*) -1)
+
 extern mach_port_t mach_reply_port(void);
 
 #undef bzero
@@ -44,8 +46,8 @@ int giveCSDebugToPID(int pid, int forceDisablePAC, int *pacDisabled) {
     csdebug.base.hdr.msgh_size = sizeof(csdebug);
     csdebugRpl.base.hdr.msgh_size = sizeof(csdebugRpl);
     
-    csdebug.base.action = FUFUGUGU_ACTION_CSDEBUG;
-    csdebug.pid = pid;
+    csdebug.base.action     = FUFUGUGU_ACTION_CSDEBUG;
+    csdebug.pid             = pid;
     csdebug.forceDisablePAC = forceDisablePAC;
     
     kern_return_t kr = fufuguguRequest(&csdebug.base, &csdebugRpl.base);
@@ -70,8 +72,8 @@ int trustCDHash(const uint8_t *hash, size_t hashSize, uint8_t hashType) {
     trustRpl.hdr.msgh_size = sizeof(trustRpl);
     
     trust.base.action = FUFUGUGU_ACTION_TRUST;
-    trust.hashType = 2;
-    trust.hashLen = 20;
+    trust.hashType    = 2;
+    trust.hashLen     = 20;
     memcpy(trust.hash, hash, 20);
     
     kern_return_t kr = fufuguguRequest(&trust.base, &trustRpl);
@@ -79,6 +81,28 @@ int trustCDHash(const uint8_t *hash, size_t hashSize, uint8_t hashType) {
         return kr;
     
     return trustRpl.status;
+}
+
+int fixprotSingle(uint64_t pid, void *addr, size_t size) {
+    struct FuFuGuGuMsgFixprotSingle fixprot;
+    bzero(&fixprot, sizeof(fixprot));
+    
+    struct FuFuGuGuMsgReply fixprotRpl;
+    bzero(&fixprotRpl, sizeof(fixprotRpl));
+    
+    fixprot.base.hdr.msgh_size = sizeof(fixprot);
+    fixprotRpl.hdr.msgh_size = sizeof(fixprotRpl);
+    
+    fixprot.base.action = FUFUGUGU_ACTION_FIXPROT_SINGLE;
+    fixprot.pid         = pid;
+    fixprot.address     = addr;
+    fixprot.size        = size;
+    
+    kern_return_t kr = fufuguguRequest(&fixprot.base, &fixprotRpl);
+    if (kr != KERN_SUCCESS)
+        return kr;
+    
+    return fixprotRpl.status;
 }
 
 kern_return_t fufuguguRequest(struct FuFuGuGuMsg *msg, struct FuFuGuGuMsgReply *reply) {
@@ -184,6 +208,19 @@ int HOOK(__fcntl)(int fd, int cmd, void *arg1, void *arg2, void *arg3, void *arg
         }
         
         return 0;
+    }
+    
+    return res;
+}
+
+void* HOOK(__mmap)(void *addr, size_t len, int prot, int flags, int fd, off_t pos) {
+    void *res = (void*) msyscall_errno(0xC5, addr, len, prot, flags, fd, pos);
+    if (res == MAP_FAILED && (prot & VM_PROT_EXECUTE)) {
+        res = (void*) msyscall_errno(0xC5, addr, len, prot & ~(VM_PROT_WRITE | VM_PROT_EXECUTE), flags, fd, pos);
+        if (res != MAP_FAILED) {
+            fixprotSingle(getpid(), res, len);
+            vm_protect(task_self_trap(), (uintptr_t) res, len, 0, VM_PROT_READ | VM_PROT_EXECUTE);
+        }
     }
     
     return res;
