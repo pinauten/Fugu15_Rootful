@@ -453,11 +453,7 @@ int my_xpc_receive_mach_msg(void *msg, void *a2, void *a3, void *a4, xpc_object_
         if (msgSize <= msgBufSize && msgSize >= sizeof(struct FuFuGuGuMsg) && fMsg->magic == FUFUGUGU_MSG_MAGIC) {
             handle_FuFuGuGu_msg(fMsg);
             
-            // This is what xpc_receive_mach_msg does, so we do that too
-            if (a3)
-                os_release(a3);
-            mach_msg_destroy(&fMsg->hdr);
-            return 22;
+            // Pass the message to xpc_receive_mach_msg anyway, it will get rid of it for us
         }
     }
     
