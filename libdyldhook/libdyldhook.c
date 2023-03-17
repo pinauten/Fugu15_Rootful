@@ -191,7 +191,9 @@ int HOOK(__fcntl)(int fd, int cmd, void *arg1, void *arg2, void *arg3, void *arg
 
 void libdyldhook_init(void *kernelParams) {
     int pacDisabled = 0;
-    giveCSDebugToPID(getpid(), 0, &pacDisabled);
+    
+    if (getpid() != 1)
+        giveCSDebugToPID(getpid(), 1, &pacDisabled);
     
     // TODO: Handle pacDisabled
 }

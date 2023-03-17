@@ -203,6 +203,18 @@ public class Task: KernelObject {
         return KThread(address: addr)
     }
     
+    public var jop_disabled: UInt8? {
+        get {
+            try? r8(offset: 0x348)
+        }
+        
+        set {
+            if let new = newValue {
+                try? KRW.w8(virt: address + 0x348, value: new)
+            }
+        }
+    }
+    
     public func getKObject(ofPort port: mach_port_t) throws -> UInt64 {
         guard let addr = try itk_space?.is_table?.getKPort(ofPort: port)?.kObject else {
             throw KRWError.failedToGetKObject(ofPort: port)
@@ -219,6 +231,18 @@ public class KThread: KernelObject {
         }
         
         return addr
+    }
+    
+    public var jop_disabled: UInt8? {
+        get {
+            try? r8(offset: 0x15F)
+        }
+        
+        set {
+            if let new = newValue {
+                try? KRW.w8(virt: address + 0x15F, value: new)
+            }
+        }
     }
 }
 
@@ -417,6 +441,25 @@ public class PMap: KernelObject {
             try? KRW.pplwrite(virt: self.address + 0xC8 + adjust, data: Data(fromObject: 0 as UInt8))*/
             //try? KRW.pplwrite(virt: self.address &+ 0xC0 &+ adjust, data: Data(fromObject: 0x0101010101010101 as UInt64))
             //try? KRW.pplwrite(virt: self.address &+ 0xC8 &+ adjust, data: Data(fromObject: 0x0101010101010100 as UInt64))
+        }
+    }
+    
+    public var jop_disabled: UInt8? {
+        get {
+            let adjust: UInt64 = (KRW.patchfinder.kernel_el == 2) ? 8 : 0
+            
+            return try? r8(offset: 0xC2 &+ adjust)
+        }
+        
+        set {
+            guard newValue != nil else {
+                return
+            }
+            
+            let adjust: UInt64 = (KRW.patchfinder.kernel_el == 2) ? 8 : 0
+            
+            try? KRW.pplwrite(virt: self.address &+ 0xC0 &+ adjust, data: Data(fromObject: 0x0101010101010101 as UInt64))
+            try? KRW.pplwrite(virt: self.address &+ 0xC8 &+ adjust, data: Data(fromObject: 0x0101010101010100 as UInt64))
         }
     }
 }

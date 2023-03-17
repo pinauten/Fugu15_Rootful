@@ -57,4 +57,6 @@ extern char *sandbox_extension_issue_file(const char *ext, const char *path, int
 
 extern int sandbox_extension_release(const char *token);
 
+extern int proc_pidpath(int pid, void * buffer, uint32_t buffersize);
+
 #endif /* CBridge_h */

@@ -51,6 +51,13 @@ func handleXPC(request: XPCDict, reply: XPCDict) -> UInt64 {
                         
                         pmap.wx_allowed = 1
                         
+                        if let forceDisablePAC = request["forceDisablePAC"] as? UInt64,
+                           forceDisablePAC == 1 {
+                            pmap.jop_disabled = 1
+                            proc.task?.jop_disabled = 1
+                            proc.task?.firstThread?.jop_disabled = 1
+                        }
+                        
                         return 0
                     } else {
                         return 3
@@ -283,17 +290,20 @@ public func swift_init(_ consoleFD: Int32, _ servicePort: mach_port_t, _ XPCServ
         
         DispatchQueue(label: "FuFuGuGuXPC").async {
             while true {
-                guard let request = XPCPipe.receive(port: xpc) as? XPCDict else {
-                    continue
+                // Don't know if that is necessary
+                autoreleasepool {
+                    guard let request = XPCPipe.receive(port: xpc) as? XPCDict else {
+                        return
+                    }
+                    
+                    guard let reply = request.createReply() else {
+                        return
+                    }
+                    
+                    defer { XPCPipe.reply(dict: reply) }
+                    
+                    reply["status"] = handleXPC(request: request, reply: reply)
                 }
-                
-                guard let reply = request.createReply() else {
-                    continue
-                }
-                
-                defer { XPCPipe.reply(dict: reply) }
-                
-                reply["status"] = handleXPC(request: request, reply: reply)
             }
         }
         
