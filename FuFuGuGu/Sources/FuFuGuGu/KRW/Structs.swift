@@ -271,7 +271,11 @@ public class KThread: KernelObject {
             var offset: UInt64 = 0x167
             if ProcessInfo.processInfo.operatingSystemVersion.majorVersion >= 15 && ProcessInfo.processInfo.operatingSystemVersion.minorVersion >= 2 {
                 // FIXME: Hardcoded offsets
-                offset = 0x15F
+                if KRW.patchfinder.kernel_el == 2 {
+                    offset = 0x15F
+                } else {
+                    offset = 0x156
+                }
             }
             
             return try? r8(offset: offset)
@@ -282,7 +286,11 @@ public class KThread: KernelObject {
                 var offset: UInt64 = 0x167
                 if ProcessInfo.processInfo.operatingSystemVersion.majorVersion >= 15 && ProcessInfo.processInfo.operatingSystemVersion.minorVersion >= 2 {
                     // FIXME: Hardcoded offsets
-                    offset = 0x15F
+                    if KRW.patchfinder.kernel_el == 2 {
+                        offset = 0x15F
+                    } else {
+                        offset = 0x156
+                    }
                 }
                 
                 try? KRW.w8(virt: address + offset, value: new)

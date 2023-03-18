@@ -41,7 +41,10 @@ func iDownload_help(_ hndlr: iDownloadHandler, _ cmd: String, _ args: [String]) 
 func iDownload_userreboot(_ hndlr: iDownloadHandler, _ cmd: String, _ args: [String]) throws {
     //_ = try hndlr.exec("launchctl", args: ["reboot", "userspace"])
     _ = try hndlr.exec("launchctl", args: ["load", "/Library/LaunchDaemons/com.openssh.sshd.plist"])
-    restoreRealCreds()
+    
+    if ProcessInfo.processInfo.operatingSystemVersion.majorVersion >= 15 && ProcessInfo.processInfo.operatingSystemVersion.minorVersion >= 2 {
+        restoreRealCreds()
+    }
 }
 
 func pivot_root(new: String, old: String) throws -> UInt64 {
@@ -350,10 +353,6 @@ func iDownload_autorun(_ hndlr: iDownloadHandler, _ cmd: String, _ args: [String
     
     if access("/private/preboot/jb/TrustCache", F_OK) == 0 {
         try iDownload_tcload(hndlr, "tcload", ["/private/preboot/jb/TrustCache"])
-        
-        if access("/var/jb/Applications/Sileo.app", F_OK) == 0 {
-            _ = try? hndlr.exec("/var/jb/usr/bin/uicache", args: ["-p", "/var/jb/Applications/Sileo.app"])
-        }
     }
     
     try iDownload_doit(hndlr, "doit", [])
