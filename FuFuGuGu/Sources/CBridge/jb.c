@@ -58,16 +58,6 @@ xpc_pipe_t gJBDPipe = NULL;
 
 #define assure(cond) do {if (!(cond)){err = __LINE__; goto error;}}while(0)
 
-void *my_malloc(size_t sz) {
-    int fd_console = open("/dev/console",O_RDWR,0);
-    void *res = malloc(sz);
-    dprintf(fd_console, "malloc %zu -> %p\n", sz, res);
-    usleep(10000);
-    close(fd_console);
-    
-    return res;
-}
-
 const char* xpcproxy_blacklist[] = {
     "diagnosticd",  // syslog
     "logd",         // syslog
