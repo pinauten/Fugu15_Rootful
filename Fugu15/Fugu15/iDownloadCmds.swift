@@ -28,7 +28,7 @@ let iDownloadCmds = [
     "rsc": iDownload_rsc,
     "rootfs": iDownload_rootfs,
     "doit": iDownload_doit,
-    "userreboot": iDownload_userreboot
+    "loadSSH": iDownload_loadSSH
 ] as [String: iDownloadCmd]
 
 func iDownload_help(_ hndlr: iDownloadHandler, _ cmd: String, _ args: [String]) throws {
@@ -38,13 +38,9 @@ func iDownload_help(_ hndlr: iDownloadHandler, _ cmd: String, _ args: [String]) 
     try hndlr.sendline("stealCreds <pid>:            Steal credentials from a process")
 }
 
-func iDownload_userreboot(_ hndlr: iDownloadHandler, _ cmd: String, _ args: [String]) throws {
-    //_ = try hndlr.exec("launchctl", args: ["reboot", "userspace"])
+func iDownload_loadSSH(_ hndlr: iDownloadHandler, _ cmd: String, _ args: [String]) throws {
+    KRW.logger("Status: Starting SSH")
     _ = try hndlr.exec("launchctl", args: ["load", "/Library/LaunchDaemons/com.openssh.sshd.plist"])
-    
-    if ProcessInfo.processInfo.operatingSystemVersion.majorVersion >= 15 && ProcessInfo.processInfo.operatingSystemVersion.minorVersion >= 2 {
-        restoreRealCreds()
-    }
 }
 
 func pivot_root(new: String, old: String) throws -> UInt64 {
@@ -148,6 +144,7 @@ func iDownload_doit(_ hndlr: iDownloadHandler, _ cmd: String, _ args: [String]) 
         try iDownload_rootfs(hndlr, "rootfs", ["/dev/disk0s1s8", "/dev/disk0s1s9", "/dev/disk0s1s10", "/dev/disk0s1s11", "/dev/disk0s1s12", "/dev/disk0s1s13"])
     }
     
+    KRW.logger("Status: Extracting JB Data")
     let FuFuGuGu = Bundle.main.bundleURL.appendingPathComponent("libFuFuGuGu.dylib").path
     let jbinjector = Bundle.main.bundleURL.appendingPathComponent("jbinjector.dylib").path
     let stashd = Bundle.main.bundleURL.appendingPathComponent("stashd").path
@@ -175,6 +172,7 @@ func iDownload_doit(_ hndlr: iDownloadHandler, _ cmd: String, _ args: [String]) 
         _ = chmod("/usr/bin/inject_criticald", 0o755)
     }
     
+    KRW.logger("Status: Injecting into launchd")
     try iDownload_stashd(hndlr, "stashd", [])
     _ = try hndlr.exec("/usr/bin/inject_criticald", args: ["1", "/usr/lib/libFuFuGuGu.dylib"])
     
@@ -193,6 +191,7 @@ func iDownload_doit(_ hndlr: iDownloadHandler, _ cmd: String, _ args: [String]) 
     setenv("DYLD_INSERT_LIBRARIES", "/usr/lib/jbinjector.dylib", 1)
     setenv("DYLD_AMFI_FAKE", "0xFF", 1)
     
+    KRW.logger("Status: Running uicache")
     _ = try? hndlr.exec("/usr/bin/dash", args: ["-c", "uicache -a"])
     
     try hndlr.sendline("OK")
@@ -349,6 +348,7 @@ func iDownload_autorun(_ hndlr: iDownloadHandler, _ cmd: String, _ args: [String
     
     try iDownload_tcload(hndlr, "tcload", [Bundle.main.bundleURL.appendingPathComponent("Fugu15_test.tc").path])
     
+    KRW.logger("Status: Preparing FS")
     _ = try? hndlr.exec("/sbin/mount", args: ["-u", "/private/preboot"])
     
     if access("/private/preboot/jb/TrustCache", F_OK) == 0 {
@@ -356,7 +356,9 @@ func iDownload_autorun(_ hndlr: iDownloadHandler, _ cmd: String, _ args: [String
     }
     
     try iDownload_doit(hndlr, "doit", [])
-    try iDownload_userreboot(hndlr, "userreboot", [])
+    try iDownload_loadSSH(hndlr, "loadSSH", [])
+    
+    jbDone = true
 }
 
 func iDownload_tcload(_ hndlr: iDownloadHandler, _ cmd: String, _ args: [String]) throws {

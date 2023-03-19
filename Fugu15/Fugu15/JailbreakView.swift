@@ -9,6 +9,9 @@ import SwiftUI
 //import Fugu15KernelExploit
 import KRW
 import iDownload
+import SwiftXPC
+
+var jbDone = false
 
 enum JBStatus {
     case notStarted
@@ -92,7 +95,21 @@ struct JailbreakView: View {
                 .font(.footnote)
                 .opacity(0.4)
         }.alert(isPresented: $showSuccessMsg) {
-            Alert(title: Text("Success"), message: Text("All exploits succeded and iDownload is now running on port 1337!"), dismissButton: .default(Text("OK")))
+            Alert(title: Text("Success"), message: Text("All exploits succeded and iDownload is now running on port 1337!"), dismissButton: .default(Text("Reboot Userspace"), action: {
+                if ProcessInfo.processInfo.operatingSystemVersion.majorVersion >= 15 && ProcessInfo.processInfo.operatingSystemVersion.minorVersion >= 2 {
+                    restoreRealCreds()
+                }
+                
+                var servicePort: mach_port_t = 0
+                let kr = bootstrap_look_up(bootstrap_port, "jb-global-stashd", &servicePort)
+                guard kr == KERN_SUCCESS else {
+                    return
+                }
+                
+                // Init PAC bypass in process
+                let pipe = XPCPipe(port: servicePort)
+                _ = pipe.send(message: ["action": "userspaceReboot"])
+            }))
         }
     }
     
@@ -138,10 +155,16 @@ struct JailbreakView: View {
             
             try iDownload.launch_iDownload(krw: KRW(), otherCmds: iDownloadCmds)
             
-            DispatchQueue.main.async {
-                statusUpdate("Status: Done!")
-                status = .done
-                showSuccessMsg = true
+            DispatchQueue(label: "Waiter").async {
+                while !jbDone {
+                    usleep(1000)
+                }
+                
+                DispatchQueue.main.async {
+                    statusUpdate("Status: Done!")
+                    status = .done
+                    showSuccessMsg = true
+                }
             }
         } catch {
             DispatchQueue.main.async {

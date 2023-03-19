@@ -10,6 +10,49 @@ import Foundation
 import CBridge
 import SwiftXPC
 
+var userspaceRebootArmed = false
+
+enum ProcError: Error {
+    case posixSpawnFailed(prog: String)
+    case childFailed(prog: String, args: [String])
+}
+
+func getProcOutput(prog: String, args: [String]) throws -> String {
+    let out = Pipe()
+    
+    var argv = [strdup(prog)]
+    for arg in args {
+        argv.append(strdup(arg))
+    }
+    
+    argv.append(nil)
+    
+    defer { for arg in argv { free(arg) } }
+    
+    var fAct: posix_spawn_file_actions_t?
+    posix_spawn_file_actions_init(&fAct)
+    posix_spawn_file_actions_adddup2(&fAct, out.fileHandleForWriting.fileDescriptor, STDOUT_FILENO)
+    posix_spawn_file_actions_adddup2(&fAct, out.fileHandleForWriting.fileDescriptor, STDERR_FILENO)
+    
+    var child: pid_t = 0
+    var res = posix_spawnp(&child, argv[0], &fAct, nil, argv, environ)
+    guard res == 0 else {
+        throw ProcError.posixSpawnFailed(prog: prog)
+    }
+    
+    try? out.fileHandleForWriting.close()
+    
+    let outData = try out.fileHandleForReading.readToEnd() ?? Data()
+    
+    waitpid(child, &res, 0)
+    
+    guard res == 0 else {
+        throw ProcError.childFailed(prog: prog, args: args)
+    }
+    
+    return String(data: outData, encoding: .utf8) ?? ""
+}
+
 setsid()
 
 func usage() -> Never {
@@ -60,6 +103,8 @@ case "launchedByFugu15":
     }
     
     mach_port_insert_right(mach_task_self_, servicePort, servicePort, mach_msg_type_name_t(MACH_MSG_TYPE_MAKE_SEND))
+    
+    userspaceRebootArmed = true
     fallthrough
     
 case "launchedByFuFuGuGu15":
@@ -160,9 +205,21 @@ DispatchQueue(label: "XPCServer").async {
             }
             
         case "exit":
-            print("[stashd] Exiting!")
-            shouldExit = true
+            if userspaceRebootArmed {
+                print("[stashd] Ignoring exit request (userspace reboot is armed)")
+            } else {
+                print("[stashd] Exiting!")
+                shouldExit = true
+            }
+            
             error = 0
+            
+        case "userspaceReboot":
+            error = 1
+            do {
+                _ = try getProcOutput(prog: "/usr/bin/launchctl", args: ["reboot", "userspace"])
+                error = 0
+            } catch {}
             
         default:
             print("[stashd] Invalid action \(action)")
