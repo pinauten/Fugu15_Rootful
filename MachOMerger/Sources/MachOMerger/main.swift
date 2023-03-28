@@ -307,6 +307,40 @@ if let symsB = try? b.getSymbolTable(),
             var data = seg.1
             data = data.subdata(in: 0..<off) + Data(fromObject: instr) + data.subdata(in: (off + 4)..<data.count)
             relocInfo.replaceSegment(name: seg.0, isB: true, data: data)
+        } else if sym.name.starts(with: "_MACHOMERGER_HOOKTRAMPOLINE_") {
+            let dstName = sym.name.replacingOccurrences(of: "_MACHOMERGER_HOOKTRAMPOLINE", with: "")
+            
+            var dstAddr: UInt64!
+            if let d = getMagicSymbolVal(dstName) {
+                dstAddr = d.0
+            } else if let d = symsA.symbol(forName: dstName) {
+                dstAddr = d.value
+            }
+            
+            guard dstAddr != nil else {
+                print("Cannot resolve symbol \(dstName)")
+                exit(-1)
+            }
+            
+            // Generate instruction
+            let at = relocInfo.translate(address: sym.value, isB: true)
+            let to = relocInfo.translate(address: dstAddr, isB: false) + 4
+            
+            let delta = Int64(bitPattern: to &- at)
+            let deltaSh = delta >> 2
+            guard deltaSh <= 0x3FFFFFF && deltaSh >= -0x3FFFFFF else {
+                print("Cannot generate trampoline: Delta too large!")
+                exit(-1)
+            }
+            
+            let instr = 0x14000000 | UInt32(deltaSh & 0x03FFFFFF)
+            
+            // Write it
+            let seg = relocInfo.segment(forOrigAddress: sym.value, isB: true)!
+            let off = Int(seg.3)
+            var data = seg.1
+            data = data.subdata(in: 0..<off) + Data(fromObject: instr) + data.subdata(in: (off + 4)..<data.count)
+            relocInfo.replaceSegment(name: seg.0, isB: true, data: data)
         } else if sym.name.starts(with: "_MACHOMERGER_HOOK_") {
             let dstName = sym.name.replacingOccurrences(of: "_MACHOMERGER_HOOK", with: "")
             

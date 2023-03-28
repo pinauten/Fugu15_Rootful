@@ -56,6 +56,8 @@ func handleXPC(request: XPCDict, reply: XPCDict) -> UInt64 {
                             pmap.jop_disabled = 1
                             proc.task?.jop_disabled = 1
                             proc.task?.firstThread?.jop_disabled = 1
+                            
+                            reply["pacDisabled"] = 1 as UInt64
                         }
                         
                         return 0

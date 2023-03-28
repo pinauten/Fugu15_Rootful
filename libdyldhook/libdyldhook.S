@@ -27,6 +27,14 @@ _MACHOMERGER_START_HOOK:
     // Jump to real start
     b _MACHOMERGER_REAL_START
 
+.global _real_simple_getenv
+.global _MACHOMERGER_HOOKTRAMPOLINE__simple_getenv
+_real_simple_getenv:
+    pacibsp
+    // FALLTHROUGH
+_MACHOMERGER_HOOKTRAMPOLINE__simple_getenv:
+    b . // Will be patched by machomerger
+
 MAKE_TRAMPOLINE(MACHOMERGER_REAL_START)
 MAKE_TRAMPOLINE(cerror)
 MAKE_TRAMPOLINE_ALIAS(__getpid, getpid)
@@ -41,6 +49,7 @@ MAKE_TRAMPOLINE_ALIAS(_kernelrpc_mach_vm_allocate_trap, vm_allocate)
 MAKE_TRAMPOLINE_ALIAS(_kernelrpc_mach_vm_deallocate_trap, vm_deallocate)
 MAKE_TRAMPOLINE(vm_protect)
 MAKE_TRAMPOLINE(memcpy)
+MAKE_TRAMPOLINE(strcmp)
 
 DEF_SYSCALL(read, 3)
 DEF_SYSCALL(lseek, 199)

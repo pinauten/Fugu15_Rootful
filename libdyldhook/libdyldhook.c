@@ -26,6 +26,8 @@ kern_return_t fufuguguRequest(struct FuFuGuGuMsg *msg, struct FuFuGuGuMsgReply *
 mach_port_t gReplyPort = 0;
 mach_port_t gBootstrapPort = 0;
 
+int gTweakCompatEn = 0;
+
 uint8_t fixupsDone[] = {
     // "LIBDYLDHOOK_NOTIFY_FIXUPS_DONE"
     0x4c, 0x49, 0x42, 0x44, 0x59, 0x4c, 0x44, 0x48,
@@ -261,11 +263,19 @@ void* HOOK(__mmap)(void *addr, size_t len, int prot, int flags, int fd, off_t po
     return res;
 }
 
+extern const char *real_simple_getenv(const char *argv[], const char *which);
+
+const char *HOOK(_simple_getenv)(const char *argv[], const char *which) {
+    if (gTweakCompatEn && strcmp(which, "ptrauth_disabled") == 0) {
+        return "1";
+    }
+    
+    return real_simple_getenv(argv, which);
+}
+
 void libdyldhook_init(void *kernelParams) {
-    int pacDisabled = 0;
-    
-    if (getpid() != 1)
-        giveCSDebugToPID(getpid(), 1, &pacDisabled);
-    
-    // TODO: Handle pacDisabled
+    if (getpid() != 1) {
+        giveCSDebugToPID(getpid(), 1, &gTweakCompatEn);
+        gTweakCompatEn = 1; // Fix it to one for now...
+    }
 }
