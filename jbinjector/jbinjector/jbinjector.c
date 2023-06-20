@@ -896,6 +896,28 @@ int my_fcntl(int fd, int cmd, ...){
 #endif
 DYLD_INTERPOSE(my_fcntl, fcntl);
 
+kern_return_t really_my_vm_protect(vm_map_t target_task, vm_address_t address, vm_size_t size, boolean_t set_maximum, vm_prot_t new_protection){
+    kern_return_t ret = vm_protect(target_task, address, size, set_maximum, new_protection);
+    if (ret && new_protection & VM_PROT_EXECUTE){
+        pid_t tgtpid = 0;
+        if (pid_for_task(target_task, &tgtpid)) return ret;
+        xpc_object_t startArray = xpc_array_create(NULL, 0);
+        xpc_object_t endArray = xpc_array_create(NULL, 0);
+        xpc_object_t xStart = xpc_uint64_create(address);
+        xpc_object_t xEnd   = xpc_uint64_create(address+size);
+        xpc_array_append_value(startArray, xStart);
+        xpc_array_append_value(endArray, xEnd);
+        xpc_release(xEnd);
+        xpc_release(xStart);
+        ret = fixprot(tgtpid, startArray, endArray, 1);
+        xpc_release(startArray);
+        xpc_release(endArray);
+    }
+    return ret;
+}
+DYLD_INTERPOSE(really_my_vm_protect, vm_protect);
+
+    
 void* find_dyld_address(void){
     kern_return_t err = 0;
     task_dyld_info_data_t task_dyld_info = {};
