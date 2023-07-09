@@ -362,11 +362,15 @@ public func swift_init(_ consoleFD: Int32, _ servicePort: mach_port_t, _ XPCServ
         
         let fixups = [
             (orig: "sandbox_check_by_audit_token", replacement: "my_sandbox_check_by_audit_token"),
-            (orig: "kill", replacement: "my_kill"),
             (orig: "xpc_dictionary_get_value", replacement: "my_xpc_dictionary_get_value"),
             (orig: "posix_spawn", replacement: "my_posix_spawn"),
             (orig: "posix_spawnp", replacement: "my_posix_spawnp"),
             (orig: "xpc_receive_mach_msg", replacement: "my_xpc_receive_mach_msg")
+            /*
+                DO NOT INTERPOSE THIS!!!
+                IT WILL BREAK AIRPLAY AND POSSIBLY OTHER THINGS!!!!
+//             (orig: "kill", replacement: "my_kill"),
+             */
         ] as [(orig: String, replacement: String)]
         
         try doFixups(fixups: fixups)

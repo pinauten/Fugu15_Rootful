@@ -165,7 +165,11 @@ int my_kill(pid_t pid, int sig) {
     }
     return kill(pid, sig);
 }
-DYLD_INTERPOSE(my_kill, kill);
+/*
+    DO NOT INTERPOSE THIS!!!
+    IT WILL BREAK AIRPLAY AND POSSIBLY OTHER THINGS!!!!
+ //DYLD_INTERPOSE(my_kill, kill);
+ */
 
 xpc_object_t my_xpc_dictionary_get_value(xpc_object_t dict, const char *key) {
     xpc_object_t retval = xpc_dictionary_get_value(dict, key);
