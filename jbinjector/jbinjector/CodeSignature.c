@@ -109,7 +109,7 @@ int trustCDHashesForBinary(int fd, int (^trustCDHash)(uint8_t*, size_t, uint8_t,
     int err = 0;
     struct stat st = {};
     assure(!fstat(fd, &st));
-    assure((buf = mmap(NULL, st.st_size, PROT_READ, MAP_SHARED, fd, 0)) && (buf != MAP_FAILED));
+    assure((buf = mmap(NULL, st.st_size, PROT_READ, MAP_SHARED | MAP_RESILIENT_CODESIGN, fd, 0)) && (buf != MAP_FAILED));
     
     {
         struct fat_header *ft = (struct fat_header*)buf;
