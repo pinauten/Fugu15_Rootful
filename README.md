@@ -52,7 +52,7 @@ The following commands are especially useful:
 # Credits
 The following open-source software is used by Fugu15:
 - [ldid](https://github.com/ProcursusTeam/ldid): Used to resign the patched dyld. License: [GNU Affero General Public License v3.0](https://github.com/ProcursusTeam/ldid/blob/master/COPYING)
-- [libgrabkernel](https://github.com/tihmstar/libgrabkernel): Used to download the kernel for the device so the patchfinder can be run. License: [GNU Lesser General Public License](https://github.com/tihmstar/libgrabkernel/blob/master/LICENSE)
+- [libgrabkernel](https://github.com/tihmstar/libgrabkernel): Used to download the kernel for the device so the patchfinder can be run. License: [MIT](https://github.com/tihmstar/libgrabkernel/blob/master/LICENSE)
 - [libtakeover](https://github.com/tihmstar/libtakeover): `inject_criticald`, used to inject `FuFuGuGu.dylib` into launchd. License: [GNU Lesser General Public License](https://github.com/tihmstar/libtakeover/blob/master/LICENSE)
 - [multicast_bytecopy](https://github.com/potmdehex/multicast_bytecopy): One of the kernel exploits included in Fugu15. License: Unknown - No license provided
 - [Procursus Bootstrap](https://github.com/ProcursusTeam/Procursus): The bootstrap used by Fugu15. License: [BSD 0-Clause](https://github.com/ProcursusTeam/Procursus/blob/main/LICENSE). The tools included in the bootstrap are released under many different licenses, please see the procursus repo for more information
