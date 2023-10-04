@@ -1,52 +1,14 @@
-# Fugu15
+# Fugu15 - Rootful Edition
 Fugu15 is a semi-untethered permasigned jailbreak for iOS 15.  
-It contains a code-signing bypass, kernel exploit, kernel PAC bypass and PPL bypass.  
-Additionally, it can be installed via Safari, i.e. a computer is not required, except for a Web Server that hosts Fugu15.  
+This version includes full support for tweaks and is rootful.  
+Special thanks to [tihmstar](https://twitter.com/tihmstar) for helping to turn Fugu15 into a full jailbreak and for extensively testing it.
 
-# Progress
-Current Fugu15 progress.
-
-## Fugu15
-- [x] Make Fugu15 a non-rootless jailbreak
-- [ ] Automatically mount Fugu15 partitions over real rootFS
-- [ ] Allow execution of self-signed binaries
-- [ ] Allow loading of self-signed binaries
-- [ ] Implement Tweak Injection
-- [ ] Allow unsigned code
-- [ ] ???
-
-## FuFuGuGu
-Library injected into launchd and xpcproxy
-- [x] Successfully inject into launchd
-- [x] Hook required methods
-- [ ] Launch stashd before userspace reboots
-- [x] Survive userspace reboots
-- [x] Implement service that can be looked up by applications
-- [ ] Provide service to add CSDebugged to applications
-- [ ] Provide service to add CDHash to TrustCache
-- [ ] Provide service to allow applications to access sandboxed files/folders
-- [ ] Provide service to allow applications to execute unsigned code
-- [ ] Implement libkrw/libkernrw/libwhateverrw support
-- [ ] Load tweak injection library
-- [ ] ???
-
-## stashd
-Helper service
-- [x] Transfer PPL bypass to stashd
-- [x] Transfer PAC bypass to stashd
-- [x] Survive userspace reboot
-- [x] Transfer primitives to launchd
-- [ ] ???
-
-## dyld
-- [x] Patch dyld to allow `DYLD_INSERT_LIBRARIES` (done via `DYLD_AMFI_FAKE`)
-- [x] Automatically patch dyld
-- [ ] ???
+# WARNING - ONLY FOR DEVELOPERS
+No support will be provided for this version of Fugu15. Feel free to fix it if you want to, but note that no pull requests will be accepted as I'm done with jailbreaking.  
 
 # Tested Devices and iOS Versions
-- iPhone 12 (SRD): iOS 15.4.1
-
-FIXME: Other iOS versions/devices are currently not supported
+- iPhone Xs Max: iOS 15.4.1
+- iPhone 13 Pro: iOS 15.1
 
 # Building
 Prerequisites:  
@@ -55,15 +17,28 @@ Prerequisites:
 Now you can simply run `make` to build Fugu15 (internet connection required to download dependencies).
 
 # Installing
-Note: This is only relevant if you built Fugu15 yourself. If you're using a precompiled release, see the instructions for your release.
+Simply install it via Xcode. Currently doesn't support installation via TrollStore because of some bugs.
 
-~~There are three ways to install Fugu15 on your device: Via Safari, USB or TrollStore.~~
-Install via Xcode or TrollStore for now.
-
-## Installing via TrollStore
-1. Make sure you have TrollStore installed
-2. AirDrop `Fugu15.tipa` to your device
-3. Select TrollStore in the "Open with..." prompt
+# Bootstrapping
+Currently, there is no easy way to bootstrap this version of Fugu15. To bootstrap it:
+- Remove the `doit` command from `iDownload_autorun` in `Fugu15/Fugu15/iDownloadCmds.swift`
+- Jailbreak, then once you see the success message (don't tap on `Reboot Userspace`!), connect to iDownload and run the following commands:
+- `stealCreds 1`
+- `rsc MachOMerger`
+- `rsc libdyldhook.dylib`
+- `rsc ldid`
+- `rsc bootstrapFS`
+- `rsc tar`
+- `rsc bootstrap_root.tar`
+- `/private/preboot/bootstrapFS` (You may have to run this multiple times until it works)
+- `rootfs /dev/disk0s1s8 /dev/disk0s1s9 /dev/disk0s1s10 /dev/disk0s1s11 /dev/disk0s1s12 /dev/disk0s1s13` (You might need to adjust the partition names based on the bootstrapFS output)
+- `cd /`
+- `/private/preboot/tar -xvf /private/preboot/bootstrap_root.tar`
+- Now reboot your device and add the `doit` command back to `iDownload_autorun`
+- Jailbreak, then once you see the success message (don't tap on `Reboot Userspace`!), connect to iDownload and install OpenSSH via dpkg (debs not provided)
+- Tap on the `Reboot Userspace` button
+- After the userspace reboot, SSH should be running. Use it to install Sileo and libhooker (debs not provided)
+- When done correctly, you should now have a rootful jailbreak which supports all Tweaks!
 
 # iDownload
 Like all Fugu jailbreaks, Fugu15 ships with iDownload. The iDownload shell can be accessed on port 1337 (run `iproxy 1337 1337 &` and then `nc 127.1 1337` to connect to iDownload).  
@@ -74,12 +49,15 @@ The following commands are especially useful:
 - `kcall <address> <up to 8 arguments>`: Call the kernel function at the given address, passing up to 8 64-Bit integer arguments.
 - `tcload <path to TrustCache>`: Load the given TrustCache into the kernel
 
-# Procursus Bootstrap and Sileo
-Fugu15 also ships with the procursus bootstrap and Sileo. Run the `bootstrap` command in iDownload to install both. Afterwards, you might have to respring to force Sileo to show up on the Home Screen (`uicache -r`).
+# Credits
+The following open-source software is used by Fugu15:
+- [ldid](https://github.com/ProcursusTeam/ldid): Used to resign the patched dyld. License: [GNU Affero General Public License v3.0](https://github.com/ProcursusTeam/ldid/blob/master/COPYING)
+- [libgrabkernel](https://github.com/tihmstar/libgrabkernel): Used to download the kernel for the device so the patchfinder can be run. License: [GNU Lesser General Public License](https://github.com/tihmstar/libgrabkernel/blob/master/LICENSE)
+- [libtakeover](https://github.com/tihmstar/libtakeover): `inject_criticald`, used to inject `FuFuGuGu.dylib` into launchd. License: [GNU Lesser General Public License](https://github.com/tihmstar/libtakeover/blob/master/LICENSE)
+- [multicast_bytecopy](https://github.com/potmdehex/multicast_bytecopy): One of the kernel exploits included in Fugu15. License: Unknown - No license provided
+- [Procursus Bootstrap](https://github.com/ProcursusTeam/Procursus): The bootstrap used by Fugu15. License: [BSD 0-Clause](https://github.com/ProcursusTeam/Procursus/blob/main/LICENSE). The tools included in the bootstrap are released under many different licenses, please see the procursus repo for more information
+- [Sileo](https://github.com/Sileo/Sileo): The package manager included in Fugu15. License: [BSD 4-Clause](https://github.com/Sileo/Sileo/blob/main/LICENSE)
+- [weightBufs](https://github.com/0x36/weightBufs): One of the kernel exploits included in Fugu15. License: [MIT](https://github.com/0x36/weightBufs/blob/main/LICENSE)
 
-Procursus is installed into the `/private/preboot/jb` directory and `/var/jb` is a symlink to it.
-
-FIXME: Do non-rootless install.
-
-# FIXME
-This README is incomplete.
+# License
+MIT. See the `LICENSE` file.

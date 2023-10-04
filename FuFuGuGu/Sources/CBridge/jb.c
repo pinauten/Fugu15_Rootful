@@ -58,6 +58,8 @@ xpc_pipe_t gJBDPipe = NULL;
 
 #define assure(cond) do {if (!(cond)){err = __LINE__; goto error;}}while(0)
 
+// Blacklist partially taken from libhooker-basebins
+// See: https://github.com/coolstar/libhooker-basebins/blob/273f1c1c22f3224adbcc2b1c10e1d6e21c45f672/pspawn_payload/pspawn_payload.c#L57
 const char* xpcproxy_blacklist[] = {
     "diagnosticd",  // syslog
     "logd",         // syslog
